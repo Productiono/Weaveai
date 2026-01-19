@@ -32,6 +32,11 @@ export const users = pgTable("user", {
 	planTier: text("planTier", { 
 		enum: ["free", "starter", "pro", "advanced"] 
 	}).default("free"),
+	emailVerificationCodeHash: text("emailVerificationCodeHash"),
+	emailVerificationCodeExpiresAt: timestamp("emailVerificationCodeExpiresAt", { mode: "date" }),
+	emailVerificationSessionHash: text("emailVerificationSessionHash"),
+	emailVerificationSessionExpiresAt: timestamp("emailVerificationSessionExpiresAt", { mode: "date" }),
+	emailVerificationLastSentAt: timestamp("emailVerificationLastSentAt", { mode: "date" }),
 	marketingConsent: boolean("marketingConsent").notNull().default(false),
 	createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
 })
