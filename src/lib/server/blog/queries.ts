@@ -227,7 +227,9 @@ export async function getAdminPosts(options: {
       : undefined
   ]);
 
-  const posts = await db
+  const whereClause = filters.length ? and(...filters) : undefined;
+
+  let postsQuery = db
     .select({
       id: blogPosts.id,
       title: blogPosts.title,
@@ -239,16 +241,26 @@ export async function getAdminPosts(options: {
       authorName: users.name
     })
     .from(blogPosts)
-    .leftJoin(users, eq(users.id, blogPosts.authorId))
-    .where(filters.length ? and(...filters) : undefined)
+    .leftJoin(users, eq(users.id, blogPosts.authorId));
+
+  if (whereClause) {
+    postsQuery = postsQuery.where(whereClause);
+  }
+
+  const posts = await postsQuery
     .orderBy(desc(blogPosts.updatedAt))
     .limit(pageSize)
     .offset(offset);
 
-  const [{ count }] = await db
+  let countQuery = db
     .select({ count: sql<number>`count(*)::int` })
-    .from(blogPosts)
-    .where(filters.length ? and(...filters) : undefined);
+    .from(blogPosts);
+
+  if (whereClause) {
+    countQuery = countQuery.where(whereClause);
+  }
+
+  const [{ count }] = await countQuery;
 
   return {
     posts,
