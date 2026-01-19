@@ -10,7 +10,7 @@ import { ensureValidSlug, slugify } from '$lib/server/blog/slug.js';
 import { ensureCategories, ensureTags, parseCommaList, syncPostCategories, syncPostTags } from '$lib/server/blog/admin.js';
 import { getAllCategories, getAllTags } from '$lib/server/blog/queries.js';
 import { requireAdmin } from '$lib/server/blog/requireAdmin.js';
-import { eq } from 'drizzle-orm';
+import { eq, like } from 'drizzle-orm';
 
 const PostSchema = z.object({
   title: z.string().min(3),
@@ -25,6 +25,24 @@ const PostSchema = z.object({
   categories: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional()
 });
+
+function resolveUniqueSlug(baseSlug: string, existingSlugs: string[]) {
+  const normalizedExisting = new Set(existingSlugs);
+  if (!normalizedExisting.has(baseSlug)) {
+    return baseSlug;
+  }
+
+  let maxSuffix = 1;
+  existingSlugs.forEach((slug) => {
+    if (!slug.startsWith(`${baseSlug}-`)) return;
+    const suffix = Number(slug.slice(baseSlug.length + 1));
+    if (Number.isInteger(suffix) && suffix > maxSuffix) {
+      maxSuffix = suffix;
+    }
+  });
+
+  return `${baseSlug}-${maxSuffix + 1}`;
+}
 
 export const load: PageServerLoad = async ({ locals }) => {
   await requireAdmin(locals);
@@ -48,6 +66,19 @@ export const actions: Actions = {
     const rawMetaDescription = data.get('metaDescription')?.toString() || '';
     const categories = parseCommaList(data.get('categories'));
     const tags = parseCommaList(data.get('tags'));
+    const values = {
+      title: rawTitle,
+      slug: rawSlug,
+      excerpt: rawExcerpt,
+      contentMarkdown: rawContent,
+      status: rawStatus,
+      featuredImageUrl: rawFeaturedImageUrl,
+      scheduledFor: rawScheduledFor,
+      metaTitle: rawMetaTitle,
+      metaDescription: rawMetaDescription,
+      categories: categories.join(', '),
+      tags: tags.join(', ')
+    };
 
     const parsed = PostSchema.safeParse({
       title: rawTitle,
@@ -66,47 +97,22 @@ export const actions: Actions = {
     if (!parsed.success) {
       return fail(400, {
         error: parsed.error.errors[0]?.message || 'Invalid form data',
-        values: {
-          title: rawTitle,
-          slug: rawSlug,
-          excerpt: rawExcerpt,
-          contentMarkdown: rawContent,
-          status: rawStatus,
-          featuredImageUrl: rawFeaturedImageUrl,
-          scheduledFor: rawScheduledFor,
-          metaTitle: rawMetaTitle,
-          metaDescription: rawMetaDescription,
-          categories: categories.join(', '),
-          tags: tags.join(', ')
-        }
+        fieldErrors: parsed.error.flatten().fieldErrors,
+        values
       });
     }
 
-    const generatedSlug = ensureValidSlug(rawSlug || slugify(rawTitle));
+    const baseSlug = ensureValidSlug(rawSlug || slugify(rawTitle));
 
-    const [existingSlug] = await db
-      .select({ id: blogPosts.id })
+    const existingSlugs = await db
+      .select({ slug: blogPosts.slug })
       .from(blogPosts)
-      .where(eq(blogPosts.slug, generatedSlug));
+      .where(like(blogPosts.slug, `${baseSlug}%`));
 
-    if (existingSlug) {
-      return fail(400, {
-        error: 'Slug is already in use',
-        values: {
-          title: rawTitle,
-          slug: rawSlug,
-          excerpt: rawExcerpt,
-          contentMarkdown: rawContent,
-          status: rawStatus,
-          featuredImageUrl: rawFeaturedImageUrl,
-          scheduledFor: rawScheduledFor,
-          metaTitle: rawMetaTitle,
-          metaDescription: rawMetaDescription,
-          categories: categories.join(', '),
-          tags: tags.join(', ')
-        }
-      });
-    }
+    const generatedSlug = resolveUniqueSlug(
+      baseSlug,
+      existingSlugs.map((row) => row.slug)
+    );
 
     const now = new Date();
     const scheduledForDate = rawScheduledFor ? new Date(rawScheduledFor) : null;
@@ -116,19 +122,7 @@ export const actions: Actions = {
     if (rawStatus === 'scheduled' && !hasValidSchedule) {
       return fail(400, {
         error: 'Scheduled posts require a publish date',
-        values: {
-          title: rawTitle,
-          slug: rawSlug,
-          excerpt: rawExcerpt,
-          contentMarkdown: rawContent,
-          status: rawStatus,
-          featuredImageUrl: rawFeaturedImageUrl,
-          scheduledFor: rawScheduledFor,
-          metaTitle: rawMetaTitle,
-          metaDescription: rawMetaDescription,
-          categories: categories.join(', '),
-          tags: tags.join(', ')
-        }
+        values
       });
     }
 
@@ -181,6 +175,19 @@ export const actions: Actions = {
     const rawMetaDescription = data.get('metaDescription')?.toString() || '';
     const categories = parseCommaList(data.get('categories'));
     const tags = parseCommaList(data.get('tags'));
+    const values = {
+      title: rawTitle,
+      slug: rawSlug,
+      excerpt: rawExcerpt,
+      contentMarkdown: rawContent,
+      status: 'draft',
+      featuredImageUrl: rawFeaturedImageUrl,
+      scheduledFor: '',
+      metaTitle: rawMetaTitle,
+      metaDescription: rawMetaDescription,
+      categories: categories.join(', '),
+      tags: tags.join(', ')
+    };
 
     const parsed = PostSchema.safeParse({
       title: rawTitle,
@@ -199,47 +206,22 @@ export const actions: Actions = {
     if (!parsed.success) {
       return fail(400, {
         error: parsed.error.errors[0]?.message || 'Invalid form data',
-        values: {
-          title: rawTitle,
-          slug: rawSlug,
-          excerpt: rawExcerpt,
-          contentMarkdown: rawContent,
-          status: 'draft',
-          featuredImageUrl: rawFeaturedImageUrl,
-          scheduledFor: '',
-          metaTitle: rawMetaTitle,
-          metaDescription: rawMetaDescription,
-          categories: categories.join(', '),
-          tags: tags.join(', ')
-        }
+        fieldErrors: parsed.error.flatten().fieldErrors,
+        values
       });
     }
 
-    const generatedSlug = ensureValidSlug(rawSlug || slugify(rawTitle));
+    const baseSlug = ensureValidSlug(rawSlug || slugify(rawTitle));
 
-    const [existingSlug] = await db
-      .select({ id: blogPosts.id })
+    const existingSlugs = await db
+      .select({ slug: blogPosts.slug })
       .from(blogPosts)
-      .where(eq(blogPosts.slug, generatedSlug));
+      .where(like(blogPosts.slug, `${baseSlug}%`));
 
-    if (existingSlug) {
-      return fail(400, {
-        error: 'Slug is already in use',
-        values: {
-          title: rawTitle,
-          slug: rawSlug,
-          excerpt: rawExcerpt,
-          contentMarkdown: rawContent,
-          status: 'draft',
-          featuredImageUrl: rawFeaturedImageUrl,
-          scheduledFor: '',
-          metaTitle: rawMetaTitle,
-          metaDescription: rawMetaDescription,
-          categories: categories.join(', '),
-          tags: tags.join(', ')
-        }
-      });
-    }
+    const generatedSlug = resolveUniqueSlug(
+      baseSlug,
+      existingSlugs.map((row) => row.slug)
+    );
 
     const now = new Date();
     const contentHtml = renderMarkdown(rawContent);

@@ -34,7 +34,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
         status,
         search
       },
-      errorMessage: null
+      loadError: null
     };
   } catch (error) {
     console.error('Failed to load admin blog posts', error);
@@ -50,7 +50,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
         status,
         search
       },
-      errorMessage: 'Unable to load blog posts right now. Please try again.'
+      loadError: 'Unable to load blog posts right now. Please try again.'
     };
   }
 };

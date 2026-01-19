@@ -77,11 +77,11 @@
       <Card.Description>Manage all blog posts and publishing status.</Card.Description>
     </Card.Header>
     <Card.Content class="space-y-4">
-      {#if data.errorMessage}
+      {#if data.loadError}
         <div
           class="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive-foreground"
         >
-          {data.errorMessage}
+          {data.loadError}
         </div>
       {/if}
       <div class="grid gap-4 md:grid-cols-[2fr_1fr_auto] items-end">
