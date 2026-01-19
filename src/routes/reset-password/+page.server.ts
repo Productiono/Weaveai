@@ -4,6 +4,10 @@ import { createPasswordResetToken, getUserForReset, generateResetUrl } from '$li
 import { sendPasswordResetEmail } from '$lib/server/email.js'
 import { getSiteSettings } from '$lib/server/settings-store.js'
 import { createAuthError, handleDatabaseError, AUTH_ERRORS, AUTH_STATUS_CODES, createGenericSuccessResponse, sanitizeErrorForLogging } from '$lib/utils/error-handling.js'
+import { isTurnstileEnabled, verifyTurnstileToken } from '$lib/server/turnstile'
+import { getTurnstileSiteKey } from '$lib/server/settings-store'
+import { env } from '$env/dynamic/private'
+import { getClientIP } from '$lib/server/rate-limiting.js'
 
 export const load: PageServerLoad = async ({ locals }) => {
   const session = await locals.auth()
@@ -14,11 +18,23 @@ export const load: PageServerLoad = async ({ locals }) => {
   }
 
   const settings = await getSiteSettings()
+  const [turnstileEnabled, turnstileSiteKey] = await Promise.all([
+    isTurnstileEnabled(),
+    getTurnstileSiteKey()
+  ])
+
+  const turnstileFinalSiteKey = turnstileEnabled
+    ? (turnstileSiteKey || env.TURNSTILE_SITE_KEY || '')
+    : ''
 
   return {
     settings: {
       siteName: settings.siteName || 'AI Models Platform',
       siteDescription: settings.siteDescription || 'Reset your password'
+    },
+    turnstile: {
+      enabled: turnstileEnabled,
+      siteKey: turnstileFinalSiteKey
     }
   }
 }
@@ -27,6 +43,8 @@ export const actions = {
   default: async ({ request }) => {
     const data = await request.formData()
     const email = data.get('email') as string
+    const turnstileToken = data.get('cf-turnstile-response') as string
+    const clientIP = getClientIP(request)
 
     // Validate email
     if (!email) {
@@ -37,6 +55,21 @@ export const actions = {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return createAuthError(AUTH_STATUS_CODES.BAD_REQUEST, AUTH_ERRORS.INVALID_EMAIL, { email });
+    }
+
+    const turnstileEnabled = await isTurnstileEnabled()
+    if (turnstileEnabled) {
+      if (!turnstileToken) {
+        return createAuthError(AUTH_STATUS_CODES.BAD_REQUEST, 'Please complete the security verification');
+      }
+
+      const verification = await verifyTurnstileToken(turnstileToken, clientIP)
+
+      if (!verification.success) {
+        const sanitizedError = sanitizeErrorForLogging(verification.error);
+        console.warn('Turnstile verification failed during password reset:', sanitizedError);
+        return createAuthError(AUTH_STATUS_CODES.BAD_REQUEST, 'Security verification failed. Please try again.');
+      }
     }
 
     try {

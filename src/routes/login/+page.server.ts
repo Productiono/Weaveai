@@ -2,6 +2,9 @@ import { redirect } from '@sveltejs/kit'
 import type { PageServerLoad } from './$types'
 import { isOAuthProviderEnabled } from '$lib/server/auth-config'
 import { isDemoModeEnabled } from '$lib/constants/demo-mode.js'
+import { isTurnstileEnabled } from '$lib/server/turnstile'
+import { getTurnstileSiteKey } from '$lib/server/settings-store'
+import { env } from '$env/dynamic/private'
 
 export const load: PageServerLoad = async ({ locals }) => {
   const session = await locals.auth()
@@ -13,10 +16,25 @@ export const load: PageServerLoad = async ({ locals }) => {
   
   // Load OAuth provider availability from database settings
   try {
-    const googleEnabled = await isOAuthProviderEnabled('google');
-    const appleEnabled = await isOAuthProviderEnabled('apple');
-    const twitterEnabled = await isOAuthProviderEnabled('twitter');
-    const facebookEnabled = await isOAuthProviderEnabled('facebook');
+    const [
+      googleEnabled,
+      appleEnabled,
+      twitterEnabled,
+      facebookEnabled,
+      turnstileEnabled,
+      turnstileSiteKey
+    ] = await Promise.all([
+      isOAuthProviderEnabled('google'),
+      isOAuthProviderEnabled('apple'),
+      isOAuthProviderEnabled('twitter'),
+      isOAuthProviderEnabled('facebook'),
+      isTurnstileEnabled(),
+      getTurnstileSiteKey()
+    ]);
+
+    const turnstileFinalSiteKey = turnstileEnabled
+      ? (turnstileSiteKey || env.TURNSTILE_SITE_KEY || '')
+      : '';
     
     return {
       oauthProviders: {
@@ -25,7 +43,11 @@ export const load: PageServerLoad = async ({ locals }) => {
         twitter: twitterEnabled,
         facebook: facebookEnabled
       },
-      isDemoMode: isDemoModeEnabled()
+      isDemoMode: isDemoModeEnabled(),
+      turnstile: {
+        enabled: turnstileEnabled,
+        siteKey: turnstileFinalSiteKey
+      }
     }
   } catch (error) {
     console.error('Failed to load OAuth provider settings for login page:', error);
@@ -38,7 +60,11 @@ export const load: PageServerLoad = async ({ locals }) => {
         twitter: true,
         facebook: true
       },
-      isDemoMode: isDemoModeEnabled()
+      isDemoMode: isDemoModeEnabled(),
+      turnstile: {
+        enabled: false,
+        siteKey: ''
+      }
     }
   }
 }
