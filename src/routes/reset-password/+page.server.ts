@@ -3,8 +3,6 @@ import type { Actions, PageServerLoad } from './$types.js'
 import { createPasswordResetToken, getUserForReset, generateResetUrl } from '$lib/server/password-reset.js'
 import { sendPasswordResetEmail } from '$lib/server/email.js'
 import { getSiteSettings } from '$lib/server/settings-store.js'
-import { getTurnstileWidgetSettings, validateTurnstileToken } from '$lib/server/turnstile.js'
-import { getClientIP } from '$lib/server/rate-limiting.js'
 import { createAuthError, handleDatabaseError, AUTH_ERRORS, AUTH_STATUS_CODES, createGenericSuccessResponse, sanitizeErrorForLogging } from '$lib/utils/error-handling.js'
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -16,14 +14,12 @@ export const load: PageServerLoad = async ({ locals }) => {
   }
 
   const settings = await getSiteSettings()
-  const turnstile = await getTurnstileWidgetSettings()
 
   return {
     settings: {
       siteName: settings.siteName || 'AI Models Platform',
       siteDescription: settings.siteDescription || 'Reset your password'
-    },
-    turnstile
+    }
   }
 }
 
@@ -31,16 +27,6 @@ export const actions = {
   default: async ({ request }) => {
     const data = await request.formData()
     const email = data.get('email') as string
-    const turnstileToken = data.get('cf-turnstile-response') as string
-    const clientIP = getClientIP(request);
-
-    const turnstileValidation = await validateTurnstileToken(turnstileToken, clientIP)
-    if (!turnstileValidation.success) {
-      return createAuthError(
-        AUTH_STATUS_CODES.BAD_REQUEST,
-        turnstileValidation.message || 'Security verification failed. Please try again.'
-      );
-    }
 
     // Validate email
     if (!email) {
