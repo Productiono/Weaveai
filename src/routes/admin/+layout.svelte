@@ -1,71 +1,80 @@
 <script lang="ts">
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
-  import * as NavigationMenu from "$lib/components/ui/navigation-menu/index.js";
-  import * as Card from "$lib/components/ui/card/index.js";
-  import * as Sheet from "$lib/components/ui/sheet/index.js";
+  import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+  import * as Separator from "$lib/components/ui/separator/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
-  import { MenuIcon } from "$lib/icons/index.js";
-  import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
+  import {
+    AnalyticsIcon,
+    ArrowLeftIcon,
+    CreditCardIcon,
+    GemIcon,
+    SettingsIcon,
+    SparklesIcon,
+    UserIcon,
+  } from "$lib/icons/index.js";
 
   let { children, data } = $props();
 
-  // Mobile detection
-  const isMobile = new IsMobile();
-  let mobileNavOpen = $state(false);
-
-  // Admin navigation items
   const adminNav = [
     {
       id: "dashboard",
       label: "Dashboard",
       path: "/admin",
+      icon: SparklesIcon,
     },
     {
       id: "analytics",
       label: "Analytics",
       path: "/admin/analytics",
+      icon: AnalyticsIcon,
     },
     {
       id: "users",
       label: "Users",
       path: "/admin/users",
+      icon: UserIcon,
     },
     {
       id: "payments",
       label: "Payments",
       path: "/admin/payments",
+      icon: CreditCardIcon,
     },
     {
       id: "subscriptions",
       label: "Subscriptions",
       path: "/admin/subscriptions",
+      icon: GemIcon,
     },
     {
       id: "settings",
       label: "Site Settings",
       path: "/admin/settings",
+      icon: SettingsIcon,
     },
   ];
 
-  // Get current active nav item based on pathname
   const activeNavItem = $derived(() => {
     const currentPath = page.url.pathname;
 
-    // Handle exact match for dashboard
     if (currentPath === "/admin") return "dashboard";
 
-    // Sort navigation items by path length (longest first) to match more specific routes first
     const sortedNav = [...adminNav].sort(
       (a, b) => b.path.length - a.path.length
     );
 
-    // Find the matching route (excluding dashboard since it's handled above)
     const matchedItem = sortedNav.find(
       (item) => item.id !== "dashboard" && currentPath.startsWith(item.path)
     );
 
     return matchedItem?.id || "dashboard";
+  });
+
+  const activeNavLabel = $derived(() => {
+    return (
+      adminNav.find((item) => item.id === activeNavItem())?.label || "Dashboard"
+    );
   });
 </script>
 
@@ -74,89 +83,89 @@
   <meta name="description" content={data.settings.siteDescription} />
 </svelte:head>
 
-<div class="min-h-screen bg-background">
-  <!-- Admin Header -->
-  <header
-    class="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-  >
-    <div class="w-full h-14 flex justify-between items-center px-6">
-      <!-- Left: Go back to app button -->
-      <Button
-        variant="ghost"
-        size="sm"
-        onclick={() => goto("/newchat")}
-        class="text-sm font-medium cursor-pointer"
-      >
-        ← Go back to app
-      </Button>
+<Sidebar.Provider class="min-h-screen bg-background">
+  <Sidebar.Root variant="inset" collapsible="icon">
+    <Sidebar.Header class="border-b border-sidebar-border/60">
+      <div class="flex items-center gap-2 px-2 py-3">
+        <div
+          class="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary"
+        >
+          <SparklesIcon class="size-4" />
+        </div>
+        <div class="grid flex-1 text-left text-sm leading-tight">
+          <span class="font-semibold">WeaveAI</span>
+          <span class="text-xs text-muted-foreground">Admin Console</span>
+        </div>
+      </div>
+    </Sidebar.Header>
 
-      <!-- Center: Navigation Menu (Desktop only) -->
-      {#if !isMobile.current}
-        <NavigationMenu.Root>
-          <NavigationMenu.List>
+    <Sidebar.Content class="px-2 py-4">
+      <Sidebar.Group>
+        <Sidebar.GroupLabel>Admin</Sidebar.GroupLabel>
+        <Sidebar.GroupContent>
+          <Sidebar.Menu class="space-y-1">
             {#each adminNav as navItem}
-              <NavigationMenu.Item>
-                <NavigationMenu.Link
-                  href={navItem.path}
-                  class="group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 {activeNavItem() ===
-                  navItem.id
-                    ? 'bg-accent text-accent-foreground'
-                    : ''}"
+              <Sidebar.MenuItem>
+                <Sidebar.MenuButton
+                  isActive={activeNavItem() === navItem.id}
+                  tooltipContent={navItem.label}
+                  onclick={() => goto(navItem.path)}
                 >
-                  {navItem.label}
-                </NavigationMenu.Link>
-              </NavigationMenu.Item>
+                  <svelte:component this={navItem.icon} />
+                  <span>{navItem.label}</span>
+                </Sidebar.MenuButton>
+              </Sidebar.MenuItem>
             {/each}
-          </NavigationMenu.List>
-        </NavigationMenu.Root>
-      {/if}
+          </Sidebar.Menu>
+        </Sidebar.GroupContent>
+      </Sidebar.Group>
+    </Sidebar.Content>
 
-      <!-- Right: Spacer (Desktop) / Hamburger Button (Mobile) -->
-      {#if isMobile.current}
-        <!-- Mobile: Hamburger Button -->
+    <Sidebar.Footer class="border-t border-sidebar-border/60">
+      <div class="p-2">
         <Button
           variant="ghost"
-          size="sm"
-          onclick={() => mobileNavOpen = true}
-          class="p-2"
+          class="w-full justify-start gap-2"
+          onclick={() => goto("/newchat")}
         >
-          <MenuIcon class="h-5 w-5" />
+          <ArrowLeftIcon class="size-4" />
+          <span>Go back to app</span>
         </Button>
-      {:else}
-        <!-- Desktop: Spacer for balance -->
-        <div class="w-[140px]"></div>
-      {/if}
-    </div>
-  </header>
-
-  <!-- Mobile Navigation Sheet -->
-  <Sheet.Root bind:open={mobileNavOpen}>
-    <Sheet.Content side="left" class="w-64">
-      <Sheet.Header>
-        <Sheet.Title>Admin Navigation</Sheet.Title>
-        <Sheet.Description>
-          Navigate through the admin dashboard
-        </Sheet.Description>
-      </Sheet.Header>
-      <div class="flex flex-col gap-2 py-4">
-        {#each adminNav as navItem}
-          <Button
-            variant={activeNavItem() === navItem.id ? "secondary" : "ghost"}
-            class="justify-start w-full"
-            onclick={() => {
-              goto(navItem.path);
-              mobileNavOpen = false;
-            }}
-          >
-            {navItem.label}
-          </Button>
-        {/each}
       </div>
-    </Sheet.Content>
-  </Sheet.Root>
+    </Sidebar.Footer>
 
-  <!-- Main Content -->
-  <main class="container mx-auto px-6 py-8">
-    {@render children()}
-  </main>
-</div>
+    <Sidebar.Rail />
+  </Sidebar.Root>
+
+  <Sidebar.Inset>
+    <header
+      class="flex h-14 items-center gap-3 border-b bg-background/95 px-6"
+    >
+      <Sidebar.Trigger class="md:hidden" />
+      <Separator.Root orientation="vertical" class="h-5" />
+      <div class="flex flex-1 items-center justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-xs text-muted-foreground">Admin Dashboard</p>
+          <h1 class="text-base font-semibold text-foreground truncate">
+            {activeNavLabel()}
+          </h1>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          class="gap-2"
+          onclick={() => goto("/newchat")}
+        >
+          <ArrowLeftIcon class="size-4" />
+          <span class="hidden sm:inline">Go back to app</span>
+        </Button>
+      </div>
+    </header>
+
+    <div class="flex-1 overflow-auto">
+      <div class="container mx-auto px-6 py-8">
+        {@render children()}
+      </div>
+    </div>
+  </Sidebar.Inset>
+</Sidebar.Provider>
