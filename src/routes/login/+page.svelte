@@ -3,11 +3,12 @@
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
   import { invalidateAll } from "$app/navigation";
-  import Button from "$lib/components/ui/button/button.svelte";
-  import * as Card from "$lib/components/ui/card/index.js";
-  import { Input } from "$lib/components/ui/input/index.js";
-  import { Label } from "$lib/components/ui/label/index.js";
-  import * as Separator from "$lib/components/ui/separator/index.js";
+  import { Button } from "$lib/components/ui/button";
+  import * as Card from "$lib/components/ui/card";
+  import { Input } from "$lib/components/ui/input";
+  import { Label } from "$lib/components/ui/label";
+  import * as Separator from "$lib/components/ui/separator";
+  import Logo from "$lib/components/Logo.svelte";
   import {
     authSanitizers,
     validatePasswordSafety,
@@ -196,276 +197,303 @@
   <meta name="description" content={data.settings.siteDescription} />
 </svelte:head>
 
-<div
-  class="min-h-screen flex flex-col items-center justify-center p-6 bg-muted/20"
->
-  <Card.Root class="w-full max-w-md">
-    <Card.Header class="text-center">
-      <Card.Title class="text-2xl font-bold">Log in</Card.Title>
-    </Card.Header>
-    <Card.Content class="space-y-4">
-      {#if data.oauthProviders?.google || data.oauthProviders?.apple || data.oauthProviders?.twitter || data.oauthProviders?.facebook}
-        <!-- OAuth Provider Buttons -->
-        {#if data.oauthProviders?.google}
-          <!-- Google Sign In Button -->
-          <Button
-            onclick={handleGoogleSignIn}
-            disabled={loading}
-            variant="outline"
-            class="w-full cursor-pointer"
-          >
-            <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-              />
-            </svg>
-            {loading ? "Signing in..." : "Continue with Google"}
-          </Button>
-        {/if}
-
-        {#if data.oauthProviders?.apple}
-          <!-- Apple Sign In Button -->
-          <Button
-            onclick={handleAppleSignIn}
-            disabled={loading}
-            variant="outline"
-            class="w-full cursor-pointer"
-          >
-            <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
-              />
-            </svg>
-            {loading ? "Signing in..." : "Continue with Apple"}
-          </Button>
-        {/if}
-
-        {#if data.oauthProviders?.twitter}
-          <!-- X (Twitter) Sign In Button -->
-          <Button
-            onclick={handleTwitterSignIn}
-            disabled={loading}
-            variant="outline"
-            class="w-full cursor-pointer"
-          >
-            <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
-              />
-            </svg>
-            {loading ? "Signing in..." : "Continue with X"}
-          </Button>
-        {/if}
-
-        {#if data.oauthProviders?.facebook}
-          <!-- Facebook Sign In Button -->
-          <Button
-            onclick={handleFacebookSignIn}
-            disabled={loading}
-            variant="outline"
-            class="w-full cursor-pointer"
-          >
-            <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="#1877F2">
-              <path
-                d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"
-              />
-            </svg>
-            {loading ? "Signing in..." : "Continue with Facebook"}
-          </Button>
-        {/if}
-
-        <div class="flex items-center">
-          <div class="flex-1">
-            <Separator.Root />
-          </div>
-          <span class="px-3 text-xs uppercase text-muted-foreground"> OR </span>
-          <div class="flex-1">
-            <Separator.Root />
-          </div>
-        </div>
-      {/if}
-
-      <div class="space-y-2">
-        <Label for="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="Enter your email"
-          bind:value={email}
-          onkeydown={handleKeyDown}
-          disabled={loading}
-        />
+<div class="min-h-screen bg-background">
+  <div
+    class="container relative grid min-h-screen items-center justify-center lg:max-w-none lg:grid-cols-2 lg:px-0"
+  >
+    <div class="relative hidden h-full flex-col bg-muted p-10 lg:flex">
+      <div class="absolute inset-0 bg-muted" aria-hidden="true"></div>
+      <div class="relative z-20 flex items-center text-lg font-medium">
+        <Logo class="h-8 w-auto" />
       </div>
-      <div class="space-y-2">
-        <div class="flex justify-between items-center">
-          <Label for="password">Password</Label>
-          <a
-            href="/reset-password"
-            class="text-sm text-primary hover:underline cursor-pointer"
-          >
-            Forgot your password?
-          </a>
-        </div>
-        <Input
-          id="password"
-          type="password"
-          placeholder="Enter your password"
-          bind:value={password}
-          onkeydown={handleKeyDown}
-          disabled={loading}
-        />
+      <div class="relative z-20 mt-auto space-y-3">
+        <p class="text-3xl font-bold tracking-tight">Welcome back</p>
+        <p class="text-sm text-muted-foreground">
+          Sign in to continue to {data.settings.siteName} and manage your
+          workspace.
+        </p>
       </div>
-      {#if successMessage}
-        <div class="text-sm text-green-600 text-center bg-green-50 p-2 rounded">
-          {successMessage}
-        </div>
-      {/if}
-      {#if error}
-        <div class="text-sm text-destructive text-center">
-          {authSanitizers.errorMessage(error)}
-        </div>
-      {/if}
+    </div>
+    <div class="flex w-full items-center justify-center p-6 lg:p-8">
+      <div class="w-full max-w-md space-y-6">
+        <Card.Root>
+          <Card.Header class="space-y-2 text-center">
+            <Card.Title class="text-2xl font-semibold tracking-tight">
+              Log in
+            </Card.Title>
+            <Card.Description class="text-sm text-muted-foreground">
+              Use your email and password, or continue with a provider.
+            </Card.Description>
+          </Card.Header>
+          <Card.Content class="space-y-5">
+            {#if data.oauthProviders?.google || data.oauthProviders?.apple || data.oauthProviders?.twitter || data.oauthProviders?.facebook}
+              <div class="grid gap-2">
+                {#if data.oauthProviders?.google}
+                  <Button
+                    onclick={handleGoogleSignIn}
+                    disabled={loading}
+                    variant="outline"
+                    class="w-full"
+                    type="button"
+                  >
+                    <svg class="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                      />
+                      <path
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      />
+                    </svg>
+                    {loading ? "Signing in..." : "Continue with Google"}
+                  </Button>
+                {/if}
 
-      <Button
-        onclick={handleSignIn}
-        disabled={loading || !email || !password}
-        class="w-full cursor-pointer"
-      >
-        {loading ? "Logging in..." : "Log in"}
-      </Button>
+                {#if data.oauthProviders?.apple}
+                  <Button
+                    onclick={handleAppleSignIn}
+                    disabled={loading}
+                    variant="outline"
+                    class="w-full"
+                    type="button"
+                  >
+                    <svg class="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path
+                        d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
+                      />
+                    </svg>
+                    {loading ? "Signing in..." : "Continue with Apple"}
+                  </Button>
+                {/if}
 
-      <p class="text-xs text-muted-foreground text-center">
-        By continuing, you acknowledge {data.settings.siteName}'s
-        <a class="underline underline-offset-2" href="/terms" target="_blank"
-          >Terms of Service</a
-        >.
-      </p>
-    </Card.Content>
-    <Card.Footer class="text-center">
-      <p class="text-sm text-muted-foreground">
-        Don't have an account?
-        <a href="/register" class="text-primary hover:underline cursor-pointer"
-          >Create your account</a
-        >
-      </p>
-    </Card.Footer>
-  </Card.Root>
+                {#if data.oauthProviders?.twitter}
+                  <Button
+                    onclick={handleTwitterSignIn}
+                    disabled={loading}
+                    variant="outline"
+                    class="w-full"
+                    type="button"
+                  >
+                    <svg class="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path
+                        d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
+                      />
+                    </svg>
+                    {loading ? "Signing in..." : "Continue with X"}
+                  </Button>
+                {/if}
 
-  <!-- Demo Credentials Section -->
-  {#if data.isDemoMode}
-    <Card.Root class="w-full max-w-md mt-4 py-5">
-      <Card.Content class="space-y-4">
-        <div>
-          <span class="font-semibold">Demo Credentials</span>
-        </div>
-        <div>
-          <Label>Email</Label>
-          <div class="flex items-center gap-2">
-            <span class="text-muted-foreground text-sm">demo@demo.com</span>
+                {#if data.oauthProviders?.facebook}
+                  <Button
+                    onclick={handleFacebookSignIn}
+                    disabled={loading}
+                    variant="outline"
+                    class="w-full"
+                    type="button"
+                  >
+                    <svg class="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                      <path
+                        d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"
+                      />
+                    </svg>
+                    {loading ? "Signing in..." : "Continue with Facebook"}
+                  </Button>
+                {/if}
+              </div>
+
+              <div class="relative">
+                <div class="absolute inset-0 flex items-center">
+                  <Separator.Root class="w-full" />
+                </div>
+                <div class="relative flex justify-center text-xs uppercase">
+                  <span class="bg-card px-2 text-muted-foreground">
+                    Or continue with
+                  </span>
+                </div>
+              </div>
+            {/if}
+
+            <div class="space-y-2">
+              <Label for="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                bind:value={email}
+                onkeydown={handleKeyDown}
+                disabled={loading}
+              />
+            </div>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <Label for="password">Password</Label>
+                <a
+                  href="/reset-password"
+                  class="text-sm text-primary hover:underline"
+                >
+                  Forgot your password?
+                </a>
+              </div>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                bind:value={password}
+                onkeydown={handleKeyDown}
+                disabled={loading}
+              />
+            </div>
+
+            {#if successMessage}
+              <div
+                class="rounded-md border border-primary/20 bg-primary/10 p-3 text-center text-sm text-primary"
+              >
+                {successMessage}
+              </div>
+            {/if}
+            {#if error}
+              <div
+                class="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-center text-sm text-destructive"
+              >
+                {authSanitizers.errorMessage(error)}
+              </div>
+            {/if}
 
             <Button
-              size="sm"
-              variant="outline"
-              onclick={() => copyToClipboard("demo@demo.com", "demo-email")}
-              title={copiedField === "demo-email" ? "Copied!" : "Copy email"}
+              onclick={handleSignIn}
+              disabled={loading || !email || !password}
+              class="w-full"
+              type="button"
             >
-              {#if copiedField === "demo-email"}
-                <!-- Checkmark icon -->
-                <svg
-                  class="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M5 13l4 4L19 7"
-                  ></path>
-                </svg>
-              {:else}
-                <!-- Copy/Clipboard icon -->
-                <svg
-                  class="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  ></path>
-                </svg>
-              {/if}
+              {loading ? "Logging in..." : "Log in"}
             </Button>
-          </div>
-        </div>
-        <div>
-          <Label>Password</Label>
-          <div class="flex items-center gap-2">
-            <span class="text-muted-foreground text-sm">demopass123</span>
-            <Button
-              size="sm"
-              variant="outline"
-              onclick={() => copyToClipboard("demopass123", "demo-password")}
-              title={copiedField === "demo-password"
-                ? "Copied!"
-                : "Copy password"}
-            >
-              {#if copiedField === "demo-password"}
-                <!-- Checkmark icon -->
-                <svg
-                  class="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M5 13l4 4L19 7"
-                  ></path>
-                </svg>
-              {:else}
-                <!-- Copy/Clipboard icon -->
-                <svg
-                  class="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  ></path>
-                </svg>
-              {/if}
-            </Button>
-          </div>
-        </div>
-        <Button onclick={fillDemoCredentials} class="w-full">
-          Auto-fill demo credentials
-        </Button>
-      </Card.Content>
-    </Card.Root>
-  {/if}
+
+            <p class="text-xs text-muted-foreground text-center">
+              By continuing, you acknowledge {data.settings.siteName}'s
+              <a class="underline underline-offset-2" href="/terms" target="_blank"
+                >Terms of Service</a
+              >.
+            </p>
+          </Card.Content>
+          <Card.Footer class="justify-center">
+            <p class="text-sm text-muted-foreground">
+              Don't have an account?
+              <a href="/register" class="text-primary hover:underline">
+                Create your account
+              </a>
+            </p>
+          </Card.Footer>
+        </Card.Root>
+
+        {#if data.isDemoMode}
+          <Card.Root>
+            <Card.Header>
+              <Card.Title class="text-lg font-semibold">Demo Credentials</Card.Title>
+              <Card.Description class="text-sm text-muted-foreground">
+                Use the credentials below to explore the demo workspace.
+              </Card.Description>
+            </Card.Header>
+            <Card.Content class="space-y-4">
+              <div class="space-y-2">
+                <Label>Email</Label>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-sm text-muted-foreground">demo@demo.com</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onclick={() => copyToClipboard("demo@demo.com", "demo-email")}
+                    title={copiedField === "demo-email" ? "Copied!" : "Copy email"}
+                    type="button"
+                  >
+                    {#if copiedField === "demo-email"}
+                      <svg
+                        class="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M5 13l4 4L19 7"
+                        ></path>
+                      </svg>
+                    {:else}
+                      <svg
+                        class="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        ></path>
+                      </svg>
+                    {/if}
+                  </Button>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <Label>Password</Label>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-sm text-muted-foreground">demopass123</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onclick={() => copyToClipboard("demopass123", "demo-password")}
+                    title={copiedField === "demo-password"
+                      ? "Copied!"
+                      : "Copy password"}
+                    type="button"
+                  >
+                    {#if copiedField === "demo-password"}
+                      <svg
+                        class="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M5 13l4 4L19 7"
+                        ></path>
+                      </svg>
+                    {:else}
+                      <svg
+                        class="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        ></path>
+                      </svg>
+                    {/if}
+                  </Button>
+                </div>
+              </div>
+              <Button onclick={fillDemoCredentials} class="w-full" type="button">
+                Auto-fill demo credentials
+              </Button>
+            </Card.Content>
+          </Card.Root>
+        {/if}
+      </div>
+    </div>
+  </div>
 </div>
