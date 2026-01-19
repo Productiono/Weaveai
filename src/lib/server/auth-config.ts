@@ -14,6 +14,7 @@ import { markEmailAsVerified } from './email-verification.js'
 import type { Provider } from "@auth/core/providers"
 import { authSanitizers, validatePasswordSafety } from '../utils/sanitization.js'
 import { checkAuthenticationLimits, recordSuccessfulLogin, recordFailedLogin, getClientIP } from './rate-limiting.js'
+import { isTurnstileEnabled, verifyTurnstileToken } from './turnstile.js'
 import { getSecureCookieConfig, getSecureJWTConfig, sessionSecurityCallbacks, logSecurityEvent } from './session-security.js'
 import { SecurityLogger } from './security-monitoring.js'
 
@@ -39,7 +40,7 @@ async function buildProviders(): Promise<Provider[]> {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" }
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) {
           return null
         }
@@ -50,6 +51,24 @@ async function buildProviders(): Promise<Provider[]> {
 
         if (!sanitizedEmail || !passwordValidation.isValid) {
           return null
+        }
+
+        const turnstileEnabled = await isTurnstileEnabled()
+        if (turnstileEnabled) {
+          const turnstileToken = credentials['cf-turnstile-response'] as string
+          if (!turnstileToken) {
+            SecurityLogger.loginFailure(sanitizedEmail, 'Missing Turnstile token');
+            return null
+          }
+
+          const clientIP = request ? getClientIP(request as Request) : 'unknown'
+          const verification = await verifyTurnstileToken(turnstileToken, clientIP)
+
+          if (!verification.success) {
+            console.warn('Turnstile verification failed during login:', verification.error)
+            SecurityLogger.loginFailure(sanitizedEmail, 'Turnstile verification failed');
+            return null
+          }
         }
 
         const user = await db.select().from(users).where(eq(users.email, sanitizedEmail)).limit(1)
