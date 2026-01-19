@@ -9,7 +9,24 @@
   import * as Select from "$lib/components/ui/select/index.js";
   import type { PageData } from "./$types";
 
-  let { data, form }: { data: PageData; form?: { error?: string; values?: Record<string, string> } } = $props();
+  let {
+    data,
+    form
+  }: {
+    data: PageData;
+    form?: {
+      error?: string;
+      values?: Record<string, string>;
+      fieldErrors?: Record<string, string[]>;
+    };
+  } = $props();
+
+  const statusLabels = {
+    draft: "Draft",
+    scheduled: "Scheduled",
+    published: "Published",
+    archived: "Archived"
+  } as const;
 
   let title = $state(form?.values?.title || "");
   let slug = $state(form?.values?.slug || "");
@@ -150,6 +167,9 @@
           <div class="space-y-2">
             <Label for="title">Title</Label>
             <Input id="title" name="title" bind:value={title} required />
+            {#if form?.fieldErrors?.title?.length}
+              <p class="text-xs text-destructive">{form.fieldErrors.title[0]}</p>
+            {/if}
           </div>
           <div class="space-y-2">
             <Label for="slug">Slug</Label>
@@ -159,12 +179,18 @@
               bind:value={slug}
               oninput={() => (slugEdited = true)}
             />
+            {#if form?.fieldErrors?.slug?.length}
+              <p class="text-xs text-destructive">{form.fieldErrors.slug[0]}</p>
+            {/if}
           </div>
         </div>
 
         <div class="space-y-2">
           <Label for="excerpt">Excerpt</Label>
           <Textarea id="excerpt" name="excerpt" rows={3} bind:value={excerpt} />
+          {#if form?.fieldErrors?.excerpt?.length}
+            <p class="text-xs text-destructive">{form.fieldErrors.excerpt[0]}</p>
+          {/if}
         </div>
 
         <div class="space-y-2">
@@ -178,6 +204,9 @@
             class="min-h-[360px] font-mono text-sm leading-relaxed"
             required
           />
+          {#if form?.fieldErrors?.contentMarkdown?.length}
+            <p class="text-xs text-destructive">{form.fieldErrors.contentMarkdown[0]}</p>
+          {/if}
           <div class="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
@@ -230,16 +259,20 @@
             <Label>Status</Label>
             <Select.Root bind:value={status}>
               <Select.Trigger>
-                <Select.Value placeholder="Select status" />
+                <span data-slot="select-value">
+                  {statusLabels[status as keyof typeof statusLabels] ?? statusLabels.draft}
+                </span>
               </Select.Trigger>
               <Select.Content>
-                <Select.Item value="draft">Draft</Select.Item>
-                <Select.Item value="scheduled">Scheduled</Select.Item>
-                <Select.Item value="published">Published</Select.Item>
-                <Select.Item value="archived">Archived</Select.Item>
+                {#each Object.entries(statusLabels) as [value, label]}
+                  <Select.Item value={value}>{label}</Select.Item>
+                {/each}
               </Select.Content>
             </Select.Root>
             <input type="hidden" name="status" value={status} />
+            {#if form?.fieldErrors?.status?.length}
+              <p class="text-xs text-destructive">{form.fieldErrors.status[0]}</p>
+            {/if}
           </div>
           <div class="space-y-2">
             <Label for="scheduledFor">Schedule Date</Label>
@@ -250,6 +283,9 @@
               bind:value={scheduledFor}
               disabled={status !== "scheduled"}
             />
+            {#if form?.fieldErrors?.scheduledFor?.length}
+              <p class="text-xs text-destructive">{form.fieldErrors.scheduledFor[0]}</p>
+            {/if}
           </div>
           <div class="space-y-2">
             <Label>Featured Image</Label>
@@ -258,6 +294,9 @@
               placeholder="Paste image URL"
               bind:value={featuredImageUrl}
             />
+            {#if form?.fieldErrors?.featuredImageUrl?.length}
+              <p class="text-xs text-destructive">{form.fieldErrors.featuredImageUrl[0]}</p>
+            {/if}
           </div>
         </div>
 
@@ -289,6 +328,9 @@
               list="category-options"
               bind:value={categories}
             />
+            {#if form?.fieldErrors?.categories?.length}
+              <p class="text-xs text-destructive">{form.fieldErrors.categories[0]}</p>
+            {/if}
             <datalist id="category-options">
               {#each data.categories as category}
                 <option value={category.name} />
@@ -298,6 +340,9 @@
           <div class="space-y-2">
             <Label for="tags">Tags (comma separated)</Label>
             <Input id="tags" name="tags" list="tag-options" bind:value={tags} />
+            {#if form?.fieldErrors?.tags?.length}
+              <p class="text-xs text-destructive">{form.fieldErrors.tags[0]}</p>
+            {/if}
             <datalist id="tag-options">
               {#each data.tags as tag}
                 <option value={tag.name} />
@@ -310,10 +355,16 @@
           <div class="space-y-2">
             <Label for="metaTitle">Meta Title</Label>
             <Input id="metaTitle" name="metaTitle" bind:value={metaTitle} />
+            {#if form?.fieldErrors?.metaTitle?.length}
+              <p class="text-xs text-destructive">{form.fieldErrors.metaTitle[0]}</p>
+            {/if}
           </div>
           <div class="space-y-2">
             <Label for="metaDescription">Meta Description</Label>
             <Textarea id="metaDescription" name="metaDescription" rows={2} bind:value={metaDescription} />
+            {#if form?.fieldErrors?.metaDescription?.length}
+              <p class="text-xs text-destructive">{form.fieldErrors.metaDescription[0]}</p>
+            {/if}
           </div>
         </div>
       </Card.Content>

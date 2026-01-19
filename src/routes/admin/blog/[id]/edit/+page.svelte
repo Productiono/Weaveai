@@ -9,7 +9,20 @@
   import * as Select from "$lib/components/ui/select/index.js";
   import type { PageData } from "./$types";
 
-  let { data, form }: { data: PageData; form?: { error?: string; values?: Record<string, string> } } = $props();
+  let {
+    data,
+    form
+  }: {
+    data: PageData;
+    form?: { error?: string; values?: Record<string, string> };
+  } = $props();
+
+  const statusLabels = {
+    draft: "Draft",
+    scheduled: "Scheduled",
+    published: "Published",
+    archived: "Archived"
+  } as const;
 
   let title = $state(form?.values?.title || data.post.title || "");
   let slug = $state(form?.values?.slug || data.post.slug || "");
@@ -242,13 +255,14 @@
             <Label>Status</Label>
             <Select.Root bind:value={status}>
               <Select.Trigger>
-                <Select.Value placeholder="Select status" />
+                <span data-slot="select-value">
+                  {statusLabels[status as keyof typeof statusLabels] ?? statusLabels.draft}
+                </span>
               </Select.Trigger>
               <Select.Content>
-                <Select.Item value="draft">Draft</Select.Item>
-                <Select.Item value="scheduled">Scheduled</Select.Item>
-                <Select.Item value="published">Published</Select.Item>
-                <Select.Item value="archived">Archived</Select.Item>
+                {#each Object.entries(statusLabels) as [value, label]}
+                  <Select.Item value={value}>{label}</Select.Item>
+                {/each}
               </Select.Content>
             </Select.Root>
             <input type="hidden" name="status" value={status} />

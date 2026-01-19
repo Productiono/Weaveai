@@ -1,5 +1,5 @@
 import type { Actions, PageServerLoad } from './$types';
-import { fail, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
 import { db } from '$lib/server/db/index.js';
 import { blogPosts } from '$lib/server/db/schema.js';
@@ -9,8 +9,8 @@ import { calculateReadingTimeMinutes } from '$lib/server/blog/reading-time.js';
 import { ensureValidSlug, slugify } from '$lib/server/blog/slug.js';
 import { ensureCategories, ensureTags, parseCommaList, syncPostCategories, syncPostTags } from '$lib/server/blog/admin.js';
 import { getAllCategories, getAllTags } from '$lib/server/blog/queries.js';
-import { requireAdmin } from '$lib/server/blog/requireAdmin.js';
-import { eq, like } from 'drizzle-orm';
+import { like } from 'drizzle-orm';
+import type { RequestEvent } from '@sveltejs/kit';
 
 const PostSchema = z.object({
   title: z.string().min(3),
@@ -44,17 +44,27 @@ function resolveUniqueSlug(baseSlug: string, existingSlugs: string[]) {
   return `${baseSlug}-${maxSuffix + 1}`;
 }
 
-export const load: PageServerLoad = async ({ locals }) => {
-  await requireAdmin(locals);
+async function requireAdmin(event: RequestEvent) {
+  const session = await event.locals.auth();
+
+  if (!session?.user?.isAdmin) {
+    throw error(403, 'Admin required');
+  }
+
+  return session;
+}
+
+export const load: PageServerLoad = async (event) => {
+  await requireAdmin(event);
   const [categories, tags] = await Promise.all([getAllCategories(), getAllTags()]);
   return { categories, tags };
 };
 
 export const actions: Actions = {
-  create: async ({ request, locals }) => {
-    const session = await requireAdmin(locals);
+  create: async (event) => {
+    const session = await requireAdmin(event);
 
-    const data = await request.formData();
+    const data = await event.request.formData();
     const rawTitle = data.get('title')?.toString() || '';
     const rawSlug = data.get('slug')?.toString() || '';
     const rawExcerpt = data.get('excerpt')?.toString() || '';
@@ -102,7 +112,16 @@ export const actions: Actions = {
       });
     }
 
-    const baseSlug = ensureValidSlug(rawSlug || slugify(rawTitle));
+    let baseSlug: string;
+    try {
+      baseSlug = ensureValidSlug(rawSlug || slugify(rawTitle));
+    } catch (err) {
+      return fail(400, {
+        error: err instanceof Error ? err.message : 'Slug is required',
+        fieldErrors: { slug: [err instanceof Error ? err.message : 'Slug is required'] },
+        values
+      });
+    }
 
     const existingSlugs = await db
       .select({ slug: blogPosts.slug })
@@ -122,6 +141,7 @@ export const actions: Actions = {
     if (rawStatus === 'scheduled' && !hasValidSchedule) {
       return fail(400, {
         error: 'Scheduled posts require a publish date',
+        fieldErrors: { scheduledFor: ['Scheduled posts require a publish date'] },
         values
       });
     }
@@ -162,10 +182,10 @@ export const actions: Actions = {
 
     throw redirect(303, `/admin/blog/${post.id}/edit`);
   },
-  savePreview: async ({ request, locals }) => {
-    const session = await requireAdmin(locals);
+  savePreview: async (event) => {
+    const session = await requireAdmin(event);
 
-    const data = await request.formData();
+    const data = await event.request.formData();
     const rawTitle = data.get('title')?.toString() || '';
     const rawSlug = data.get('slug')?.toString() || '';
     const rawExcerpt = data.get('excerpt')?.toString() || '';
@@ -211,7 +231,16 @@ export const actions: Actions = {
       });
     }
 
-    const baseSlug = ensureValidSlug(rawSlug || slugify(rawTitle));
+    let baseSlug: string;
+    try {
+      baseSlug = ensureValidSlug(rawSlug || slugify(rawTitle));
+    } catch (err) {
+      return fail(400, {
+        error: err instanceof Error ? err.message : 'Slug is required',
+        fieldErrors: { slug: [err instanceof Error ? err.message : 'Slug is required'] },
+        values
+      });
+    }
 
     const existingSlugs = await db
       .select({ slug: blogPosts.slug })

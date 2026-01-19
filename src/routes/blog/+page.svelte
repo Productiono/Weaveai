@@ -47,6 +47,19 @@
 
     goto(url.toString());
   }
+
+  const categoryPlaceholder = "All categories";
+  const tagPlaceholder = "All tags";
+
+  function getCategoryLabel(value: string) {
+    if (value === "all") return categoryPlaceholder;
+    return data.categories.find((category) => category.slug === value)?.name ?? categoryPlaceholder;
+  }
+
+  function getTagLabel(value: string) {
+    if (value === "all") return tagPlaceholder;
+    return data.tags.find((tag) => tag.slug === value)?.name ?? tagPlaceholder;
+  }
 </script>
 
 <svelte:head>
@@ -81,10 +94,15 @@
       <Label>Category</Label>
       <Select.Root bind:value={categoryValue} onValueChange={() => updateFilters()}>
         <Select.Trigger>
-          <Select.Value placeholder="All categories" />
+          <span
+            data-slot="select-value"
+            class={categoryValue === "all" ? "text-muted-foreground" : undefined}
+          >
+            {getCategoryLabel(categoryValue)}
+          </span>
         </Select.Trigger>
         <Select.Content>
-          <Select.Item value="all">All categories</Select.Item>
+          <Select.Item value="all">{categoryPlaceholder}</Select.Item>
           {#each data.categories as category}
             <Select.Item value={category.slug}>{category.name}</Select.Item>
           {/each}
@@ -95,10 +113,15 @@
       <Label>Tag</Label>
       <Select.Root bind:value={tagValue} onValueChange={() => updateFilters()}>
         <Select.Trigger>
-          <Select.Value placeholder="All tags" />
+          <span
+            data-slot="select-value"
+            class={tagValue === "all" ? "text-muted-foreground" : undefined}
+          >
+            {getTagLabel(tagValue)}
+          </span>
         </Select.Trigger>
         <Select.Content>
-          <Select.Item value="all">All tags</Select.Item>
+          <Select.Item value="all">{tagPlaceholder}</Select.Item>
           {#each data.tags as tag}
             <Select.Item value={tag.slug}>{tag.name}</Select.Item>
           {/each}
