@@ -25,16 +25,6 @@ export interface WelcomeEmailData {
 }
 
 /**
- * Email verification code template data
- */
-export interface EmailVerificationCodeData {
-  name: string
-  email: string
-  code: string
-  expiresInMinutes: number
-}
-
-/**
  * Password reset email template data
  */
 export interface PasswordResetEmailData {
@@ -489,61 +479,6 @@ ${env.PUBLIC_ORIGIN || 'http://localhost:5173'}
   }
 
   /**
-   * Send email verification code to new users
-   * @param userData - User data for verification code email
-   * @returns Promise indicating success/failure
-   */
-  async sendEmailVerificationCode(userData: EmailVerificationCodeData): Promise<boolean> {
-    const smtpConfig = await this.getSmtpConfig()
-    const platformName = smtpConfig.fromName || 'AI Models Platform'
-    const displayName = userData.name || userData.email.split('@')[0]
-
-    const html = `
-<!DOCTYPE html>
-<html lang=\"en\">
-<head>
-  <meta charset=\"UTF-8\">
-  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
-  <title>Verify your email - ${platformName}</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 20px; color: #111827; background: #f8fafc; }
-    .container { background: #ffffff; padding: 28px; border-radius: 12px; border: 1px solid #e5e7eb; }
-    .code { font-size: 24px; font-weight: 700; letter-spacing: 6px; background: #f3f4f6; padding: 12px 16px; border-radius: 10px; text-align: center; }
-    .muted { color: #6b7280; font-size: 14px; }
-  </style>
-</head>
-<body>
-  <div class=\"container\">
-    <h2>Verify your email</h2>
-    <p>Hi ${displayName},</p>
-    <p>Use the verification code below to finish setting up your ${platformName} account.</p>
-    <div class=\"code\">${userData.code}</div>
-    <p class=\"muted\">This code expires in ${userData.expiresInMinutes} minutes and can only be used once.</p>
-    <p class=\"muted\">If you did not create an account, you can safely ignore this email.</p>
-  </div>
-</body>
-</html>`
-
-    const text = `Verify your email - ${platformName}
-
-Hi ${displayName},
-
-Use this verification code to finish setting up your account:
-${userData.code}
-
-This code expires in ${userData.expiresInMinutes} minutes and can only be used once.
-If you did not create an account, you can safely ignore this email.
-`
-
-    return await this.sendEmail({
-      to: userData.email,
-      subject: `Verify your email for ${platformName}`,
-      html,
-      text
-    })
-  }
-
-  /**
    * Send password reset email to users
    * @param userData - User data for email personalization
    * @returns Promise indicating success/failure
@@ -587,6 +522,5 @@ export const emailService = new EmailService()
 
 // Export utility functions
 export const sendWelcomeEmail = (userData: WelcomeEmailData) => emailService.sendWelcomeEmail(userData)
-export const sendEmailVerificationCode = (userData: EmailVerificationCodeData) => emailService.sendEmailVerificationCode(userData)
 export const sendPasswordResetEmail = (userData: PasswordResetEmailData) => emailService.sendPasswordResetEmail(userData)
 export const testEmailConnection = () => emailService.testConnection()

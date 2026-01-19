@@ -6,12 +6,8 @@ import { eq } from "drizzle-orm"
 import { isOAuthProviderEnabled } from '$lib/server/auth-config'
 import { verifyTurnstileToken, isTurnstileEnabled, getTurnstileErrorMessage } from '$lib/server/turnstile'
 import { getTurnstileSiteKey } from '$lib/server/settings-store'
-import { sendEmailVerificationCode } from '$lib/server/email.js'
-import {
-  EMAIL_VERIFICATION_CODE_TTL_MS,
-  EMAIL_VERIFICATION_SESSION_COOKIE,
-  generateEmailVerificationState
-} from '$lib/server/email-verification-code.js'
+import { sendWelcomeEmail } from '$lib/server/email.js'
+import { createVerificationToken, generateVerificationUrl } from '$lib/server/email-verification.js'
 import { env } from '$env/dynamic/private'
 import { authSanitizers, validatePasswordSafety } from '$lib/utils/sanitization.js'
 import { validatePassword, BALANCED_PASSWORD_POLICY } from '$lib/utils/password-validation.js'
@@ -80,7 +76,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 }
 
 export const actions: Actions = {
-  register: async ({ request, getClientAddress, cookies }) => {
+  register: async ({ request, getClientAddress }) => {
     const data = await request.formData()
     const rawEmail = data.get('email') as string
     const rawPassword = data.get('password') as string
@@ -145,7 +141,6 @@ export const actions: Actions = {
       
       // Hash password (use the original raw password as it passed validation)
       const hashedPassword = await bcrypt.hash(rawPassword, 12)
-      const verificationState = await generateEmailVerificationState()
       
       // Create user
       const newUser = await db.insert(users).values({
@@ -153,11 +148,6 @@ export const actions: Actions = {
         password: hashedPassword,
         name: validatedEmail.split('@')[0], // Use email prefix as default name
         planTier: 'free', // Set new users to free plan by default
-        emailVerificationCodeHash: verificationState.codeHash,
-        emailVerificationCodeExpiresAt: verificationState.expiresAt,
-        emailVerificationSessionHash: verificationState.sessionHash,
-        emailVerificationSessionExpiresAt: verificationState.sessionExpiresAt,
-        emailVerificationLastSentAt: verificationState.lastSentAt
       }).returning({ id: users.id, email: users.email, name: users.name })
       
       // Log successful registration
@@ -166,33 +156,27 @@ export const actions: Actions = {
         SecurityLogger.registrationSuccess(userData.id, userData.email!, clientIP);
 
         try {
-          // Send verification code email
-          await sendEmailVerificationCode({
+          // Create verification token for email/password registration
+          const { token } = await createVerificationToken(userData.email!)
+          const verificationUrl = generateVerificationUrl(token)
+
+          // Send welcome email with verification link
+          await sendWelcomeEmail({
             email: userData.email!,
             name: userData.name || userData.email!.split('@')[0],
-            code: verificationState.code,
-            expiresInMinutes: Math.round(EMAIL_VERIFICATION_CODE_TTL_MS / 60000)
+            verificationUrl
           })
           SecurityLogger.emailVerificationSent(userData.email!, userData.id);
-          console.log(`[Registration] Verification code email sent`)
+          console.log(`[Registration] Welcome email with verification link sent`)
         } catch (emailError) {
           // Log error but don't fail registration
-          const sanitizedError = sanitizeErrorForLogging(emailError);
-          console.error(`[Registration] Failed to send verification code email:`, sanitizedError)
-          SecurityLogger.emailVerificationFailure(userData.email!, 'Failed to send verification code email');
+          console.error(`[Registration] Failed to send welcome email:`, emailError)
+          SecurityLogger.emailVerificationFailure(userData.email!, 'Failed to send welcome email');
         }
       }
       
-      cookies.set(EMAIL_VERIFICATION_SESSION_COOKIE, verificationState.sessionToken, {
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: env.NODE_ENV === 'production',
-        maxAge: Math.floor((verificationState.sessionExpiresAt.getTime() - Date.now()) / 1000)
-      })
-
-      // Redirect to email verification
-      throw redirect(302, '/verify-email')
+      // Redirect to login with success message
+      throw redirect(302, '/login?message=Account created successfully. Please sign in.')
       
     } catch (error) {
       // Re-throw redirects (SvelteKit redirects have a status property)
