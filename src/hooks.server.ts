@@ -1,5 +1,6 @@
 import { handle as authHandle } from "./auth.js"
 import type { Handle } from "@sveltejs/kit"
+import { redirect } from "@sveltejs/kit"
 import { sequence } from "@sveltejs/kit/hooks"
 import { settingsStore } from '$lib/server/settings-store'
 import { storageService } from '$lib/server/storage.js'
@@ -253,6 +254,40 @@ const enhancedAuthHandle: Handle = async ({ event, resolve }) => {
   return response;
 };
 
+const requiresEmailVerification = (pathname: string) => {
+  if (pathname.startsWith("/api") || pathname.startsWith("/verify-email") || pathname === "/registration-done") {
+    return false;
+  }
+
+  const gatedPaths = ["/newchat", "/chat", "/library", "/settings", "/checkout", "/audio", "/admin"];
+  return gatedPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+};
+
+const emailVerificationGate: Handle = async ({ event, resolve }) => {
+  const pathname = event.url.pathname;
+
+  if (!requiresEmailVerification(pathname)) {
+    return resolve(event);
+  }
+
+  const session = await event.locals.auth();
+  if (!session?.user?.id) {
+    return resolve(event);
+  }
+
+  const [user] = await db
+    .select({ emailVerified: users.emailVerified })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
+  if (!user?.emailVerified) {
+    throw redirect(302, "/verify-email");
+  }
+
+  return resolve(event);
+};
+
 // Combine all handles: security headers, auth rate limiting, settings, storage warming, locale default, paraglide, and enhanced auth
 // Storage warming runs after settings to ensure R2 credentials are loaded before storage initialization
 export const handle: Handle = sequence(
@@ -262,5 +297,6 @@ export const handle: Handle = sequence(
   storageWarmingHandle,
   localeDefaultHandle,
   paraglideHandle,
-  enhancedAuthHandle
+  enhancedAuthHandle,
+  emailVerificationGate
 )
