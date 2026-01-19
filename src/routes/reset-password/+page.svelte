@@ -5,7 +5,6 @@
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import Logo from "$lib/components/Logo.svelte";
-  import TurnstileWidget from "$lib/components/TurnstileWidget.svelte";
   import { authSanitizers } from "$lib/utils/sanitization.js";
 
   import { page } from "$app/state";
@@ -14,7 +13,6 @@
 
   let email = $state("");
   let loading = $state(false);
-  let turnstileToken = $state("");
 
   // Check for error message from URL params (from expired/invalid tokens)
   const errorParam = page.url.searchParams.get("error");
@@ -116,13 +114,6 @@
                     required
                   />
                 </div>
-
-                <TurnstileWidget
-                  enabled={!!data.turnstile?.enabled}
-                  siteKey={data.turnstile?.siteKey ?? ""}
-                  bind:token={turnstileToken}
-                  inputName="cf-turnstile-response"
-                />
 
                 {#if form?.error}
                   <div
