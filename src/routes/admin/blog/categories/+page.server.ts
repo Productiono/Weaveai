@@ -5,6 +5,7 @@ import { db } from '$lib/server/db/index.js';
 import { blogCategories } from '$lib/server/db/schema.js';
 import { ensureValidSlug, slugify } from '$lib/server/blog/slug.js';
 import { sanitizeFormInput } from '$lib/utils/sanitization.js';
+import { requireAdmin } from '$lib/server/blog/requireAdmin.js';
 import { eq } from 'drizzle-orm';
 
 const CategorySchema = z.object({
@@ -13,13 +14,15 @@ const CategorySchema = z.object({
   description: z.string().optional()
 });
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ locals }) => {
+  await requireAdmin(locals);
   const categories = await db.select().from(blogCategories).orderBy(blogCategories.name);
   return { categories };
 };
 
 export const actions: Actions = {
-  create: async ({ request }) => {
+  create: async ({ request, locals }) => {
+    await requireAdmin(locals);
     const data = await request.formData();
     const rawName = data.get('name')?.toString() || '';
     const rawSlug = data.get('slug')?.toString() || '';
@@ -70,7 +73,8 @@ export const actions: Actions = {
 
     return { success: true };
   },
-  delete: async ({ request }) => {
+  delete: async ({ request, locals }) => {
+    await requireAdmin(locals);
     const data = await request.formData();
     const id = data.get('id')?.toString();
     if (!id) {

@@ -9,6 +9,7 @@ import { calculateReadingTimeMinutes } from '$lib/server/blog/reading-time.js';
 import { ensureValidSlug, slugify } from '$lib/server/blog/slug.js';
 import { ensureCategories, ensureTags, parseCommaList, syncPostCategories, syncPostTags } from '$lib/server/blog/admin.js';
 import { getAllCategories, getAllTags } from '$lib/server/blog/queries.js';
+import { requireAdmin } from '$lib/server/blog/requireAdmin.js';
 import { eq } from 'drizzle-orm';
 
 const PostSchema = z.object({
@@ -25,17 +26,15 @@ const PostSchema = z.object({
   tags: z.array(z.string()).optional()
 });
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ locals }) => {
+  await requireAdmin(locals);
   const [categories, tags] = await Promise.all([getAllCategories(), getAllTags()]);
   return { categories, tags };
 };
 
 export const actions: Actions = {
   create: async ({ request, locals }) => {
-    const session = await locals.auth();
-    if (!session?.user?.id) {
-      return fail(401, { error: 'Unauthorized' });
-    }
+    const session = await requireAdmin(locals);
 
     const data = await request.formData();
     const rawTitle = data.get('title')?.toString() || '';
@@ -168,5 +167,118 @@ export const actions: Actions = {
     ]);
 
     throw redirect(303, `/admin/blog/${post.id}/edit`);
+  },
+  savePreview: async ({ request, locals }) => {
+    const session = await requireAdmin(locals);
+
+    const data = await request.formData();
+    const rawTitle = data.get('title')?.toString() || '';
+    const rawSlug = data.get('slug')?.toString() || '';
+    const rawExcerpt = data.get('excerpt')?.toString() || '';
+    const rawContent = data.get('contentMarkdown')?.toString() || '';
+    const rawFeaturedImageUrl = data.get('featuredImageUrl')?.toString() || '';
+    const rawMetaTitle = data.get('metaTitle')?.toString() || '';
+    const rawMetaDescription = data.get('metaDescription')?.toString() || '';
+    const categories = parseCommaList(data.get('categories'));
+    const tags = parseCommaList(data.get('tags'));
+
+    const parsed = PostSchema.safeParse({
+      title: rawTitle,
+      slug: rawSlug,
+      excerpt: rawExcerpt,
+      contentMarkdown: rawContent,
+      status: 'draft',
+      featuredImageUrl: rawFeaturedImageUrl,
+      scheduledFor: '',
+      metaTitle: rawMetaTitle,
+      metaDescription: rawMetaDescription,
+      categories,
+      tags
+    });
+
+    if (!parsed.success) {
+      return fail(400, {
+        error: parsed.error.errors[0]?.message || 'Invalid form data',
+        values: {
+          title: rawTitle,
+          slug: rawSlug,
+          excerpt: rawExcerpt,
+          contentMarkdown: rawContent,
+          status: 'draft',
+          featuredImageUrl: rawFeaturedImageUrl,
+          scheduledFor: '',
+          metaTitle: rawMetaTitle,
+          metaDescription: rawMetaDescription,
+          categories: categories.join(', '),
+          tags: tags.join(', ')
+        }
+      });
+    }
+
+    const generatedSlug = ensureValidSlug(rawSlug || slugify(rawTitle));
+
+    const [existingSlug] = await db
+      .select({ id: blogPosts.id })
+      .from(blogPosts)
+      .where(eq(blogPosts.slug, generatedSlug));
+
+    if (existingSlug) {
+      return fail(400, {
+        error: 'Slug is already in use',
+        values: {
+          title: rawTitle,
+          slug: rawSlug,
+          excerpt: rawExcerpt,
+          contentMarkdown: rawContent,
+          status: 'draft',
+          featuredImageUrl: rawFeaturedImageUrl,
+          scheduledFor: '',
+          metaTitle: rawMetaTitle,
+          metaDescription: rawMetaDescription,
+          categories: categories.join(', '),
+          tags: tags.join(', ')
+        }
+      });
+    }
+
+    const now = new Date();
+    const contentHtml = renderMarkdown(rawContent);
+    const readingTimeMinutes = calculateReadingTimeMinutes(rawContent);
+
+    const [post] = await db
+      .insert(blogPosts)
+      .values({
+        authorId: session.user.id,
+        slug: generatedSlug,
+        title: sanitizeFormInput(rawTitle, 200),
+        excerpt: sanitizeFormInput(rawExcerpt, 500),
+        contentMarkdown: rawContent,
+        contentHtml,
+        readingTimeMinutes,
+        status: 'draft',
+        featuredImageUrl: rawFeaturedImageUrl || null,
+        publishedAt: null,
+        scheduledFor: null,
+        metaTitle: sanitizeFormInput(rawMetaTitle, 200),
+        metaDescription: sanitizeFormInput(rawMetaDescription, 300),
+        createdAt: now,
+        updatedAt: now
+      })
+      .returning();
+
+    const [categoryRecords, tagRecords] = await Promise.all([
+      ensureCategories(categories),
+      ensureTags(tags)
+    ]);
+
+    await Promise.all([
+      syncPostCategories(post.id, categoryRecords.map((category) => category.id)),
+      syncPostTags(post.id, tagRecords.map((tag) => tag.id))
+    ]);
+
+    return {
+      previewUrl: `/blog/${post.slug}?preview=1`,
+      editUrl: `/admin/blog/${post.id}/edit`
+    };
   }
 };

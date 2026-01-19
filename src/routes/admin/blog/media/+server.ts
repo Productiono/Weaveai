@@ -4,13 +4,11 @@ import { storageService } from '$lib/server/storage.js';
 import { db } from '$lib/server/db/index.js';
 import { blogMedia } from '$lib/server/db/schema.js';
 import { sanitizeFilename } from '$lib/utils/sanitization.js';
+import { requireAdmin } from '$lib/server/blog/requireAdmin.js';
 import { randomUUID } from 'crypto';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-  const session = await locals.auth();
-  if (!session?.user?.isAdmin || !session.user.id) {
-    return error(403, 'Forbidden');
-  }
+  const session = await requireAdmin(locals);
 
   const data = await request.formData();
   const file = data.get('file');
