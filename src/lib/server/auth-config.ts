@@ -16,6 +16,7 @@ import { authSanitizers, validatePasswordSafety } from '../utils/sanitization.js
 import { checkAuthenticationLimits, recordSuccessfulLogin, recordFailedLogin, getClientIP } from './rate-limiting.js'
 import { getSecureCookieConfig, getSecureJWTConfig, sessionSecurityCallbacks, logSecurityEvent } from './session-security.js'
 import { SecurityLogger } from './security-monitoring.js'
+import { validateTurnstileToken } from './turnstile.js'
 
 // Cache for Auth.js configuration
 let authConfigCache: any = null;
@@ -37,11 +38,34 @@ async function buildProviders(): Promise<Provider[]> {
       name: "credentials",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
+        turnstileToken: { label: "Turnstile token", type: "text" }
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) {
           return null
+        }
+
+        const clientIP = request ? getClientIP(request as Request) : undefined;
+
+        const turnstileValidation = await validateTurnstileToken(
+          credentials.turnstileToken as string,
+          clientIP
+        );
+
+        if (!turnstileValidation.success) {
+          SecurityLogger.loginFailure(
+            authSanitizers.email(credentials.email as string) || 'unknown',
+            turnstileValidation.code === 'missing-token'
+              ? 'Turnstile required'
+              : 'Turnstile verification failed',
+            clientIP
+          );
+          throw new Error(
+            turnstileValidation.code === 'missing-token'
+              ? 'TurnstileRequired'
+              : 'TurnstileFailed'
+          );
         }
 
         // Sanitize inputs for security
@@ -413,11 +437,34 @@ function createDefaultConfig() {
         name: "credentials",
         credentials: {
           email: { label: "Email", type: "email" },
-          password: { label: "Password", type: "password" }
+          password: { label: "Password", type: "password" },
+          turnstileToken: { label: "Turnstile token", type: "text" }
         },
-        async authorize(credentials) {
+        async authorize(credentials, request) {
           if (!credentials?.email || !credentials?.password) {
             return null
+          }
+
+          const clientIP = request ? getClientIP(request as Request) : undefined;
+
+          const turnstileValidation = await validateTurnstileToken(
+            credentials.turnstileToken as string,
+            clientIP
+          );
+
+          if (!turnstileValidation.success) {
+            SecurityLogger.loginFailure(
+              authSanitizers.email(credentials.email as string) || 'unknown',
+              turnstileValidation.code === 'missing-token'
+                ? 'Turnstile required (fallback)'
+                : 'Turnstile verification failed (fallback)',
+              clientIP
+            );
+            throw new Error(
+              turnstileValidation.code === 'missing-token'
+                ? 'TurnstileRequired'
+                : 'TurnstileFailed'
+            );
           }
 
           // Sanitize inputs for security

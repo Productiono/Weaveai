@@ -4,17 +4,15 @@ import { db, users } from "$lib/server/db/index.js"
 import bcrypt from "bcryptjs"
 import { eq } from "drizzle-orm"
 import { isOAuthProviderEnabled } from '$lib/server/auth-config'
-import { verifyTurnstileToken, isTurnstileEnabled, getTurnstileErrorMessage } from '$lib/server/turnstile'
-import { getTurnstileSiteKey } from '$lib/server/settings-store'
+import { getTurnstileWidgetSettings, validateTurnstileToken } from '$lib/server/turnstile'
 import { sendWelcomeEmail } from '$lib/server/email.js'
 import { createVerificationToken, generateVerificationUrl } from '$lib/server/email-verification.js'
-import { env } from '$env/dynamic/private'
 import { authSanitizers, validatePasswordSafety } from '$lib/utils/sanitization.js'
 import { validatePassword, BALANCED_PASSWORD_POLICY } from '$lib/utils/password-validation.js'
 import { validateEmailForAuth } from '$lib/utils/email-validation.js'
 import { getClientIP } from '$lib/server/rate-limiting.js'
 import { SecurityLogger } from '$lib/server/security-monitoring.js'
-import { handleAuthError, createAuthError, handleDatabaseError, AUTH_ERRORS, AUTH_STATUS_CODES, sanitizeErrorForLogging } from '$lib/utils/error-handling.js'
+import { createAuthError, handleDatabaseError, AUTH_ERRORS, AUTH_STATUS_CODES } from '$lib/utils/error-handling.js'
 
 export const load: PageServerLoad = async ({ locals }) => {
   const session = await locals.auth()
@@ -31,19 +29,15 @@ export const load: PageServerLoad = async ({ locals }) => {
       appleEnabled, 
       twitterEnabled, 
       facebookEnabled,
-      turnstileEnabled,
-      turnstileSiteKey
+      turnstileSettings
     ] = await Promise.all([
       isOAuthProviderEnabled('google'),
       isOAuthProviderEnabled('apple'),
       isOAuthProviderEnabled('twitter'),
       isOAuthProviderEnabled('facebook'),
-      isTurnstileEnabled(),
-      getTurnstileSiteKey()
+      getTurnstileWidgetSettings()
     ]);
-    
-    const turnstileFinalSiteKey = turnstileEnabled ? (turnstileSiteKey || env.TURNSTILE_SITE_KEY || '') : '';
-    
+
     return {
       oauthProviders: {
         google: googleEnabled,
@@ -51,10 +45,7 @@ export const load: PageServerLoad = async ({ locals }) => {
         twitter: twitterEnabled,
         facebook: facebookEnabled
       },
-      turnstile: {
-        enabled: turnstileEnabled,
-        siteKey: turnstileFinalSiteKey
-      }
+      turnstile: turnstileSettings
     }
   } catch (error) {
     console.error('Failed to load provider settings for register page:', error);
@@ -114,19 +105,13 @@ export const actions: Actions = {
     const validatedEmail = emailValidation.normalizedEmail
     
     // Verify Turnstile token if enabled
-    const turnstileEnabled = await isTurnstileEnabled()
-    if (turnstileEnabled) {
-      if (!turnstileToken) {
-        return createAuthError(AUTH_STATUS_CODES.BAD_REQUEST, 'Please complete the security verification');
-      }
-
-      const verification = await verifyTurnstileToken(turnstileToken, clientIP)
-
-      if (!verification.success) {
-        const sanitizedError = sanitizeErrorForLogging(verification.error);
-        console.warn('Turnstile verification failed during registration:', sanitizedError);
-        return createAuthError(AUTH_STATUS_CODES.BAD_REQUEST, 'Security verification failed. Please try again.');
-      }
+    const turnstileValidation = await validateTurnstileToken(turnstileToken, clientIP)
+    if (!turnstileValidation.success) {
+      console.warn('Turnstile verification failed during registration:', turnstileValidation.code);
+      return createAuthError(
+        AUTH_STATUS_CODES.BAD_REQUEST,
+        turnstileValidation.message || 'Security verification failed. Please try again.'
+      );
     }
     
     try {
