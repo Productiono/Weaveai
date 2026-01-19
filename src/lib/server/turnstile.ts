@@ -1,4 +1,4 @@
-import { getTurnstileSecretKey } from './settings-store';
+import { getTurnstileSecretKey, getTurnstileSiteKey } from './settings-store';
 import { getSecuritySettings } from './admin-settings';
 import { env } from '$env/dynamic/private';
 
@@ -20,6 +20,18 @@ export interface TurnstileVerificationResult {
   success: boolean;
   error?: string;
   errorCodes?: string[];
+}
+
+export interface TurnstileWidgetSettings {
+  enabled: boolean;
+  siteKey: string;
+}
+
+export interface TurnstileValidationResult {
+  success: boolean;
+  required: boolean;
+  code?: 'missing-token' | 'verification-failed';
+  message?: string;
 }
 
 /**
@@ -143,6 +155,65 @@ export async function isTurnstileEnabled(): Promise<boolean> {
     console.error('Error checking Turnstile configuration:', error);
     return false;
   }
+}
+
+/**
+ * Get Turnstile widget settings for auth forms
+ * Falls back to environment variables when database settings are not available
+ */
+export async function getTurnstileWidgetSettings(): Promise<TurnstileWidgetSettings> {
+  const enabled = await isTurnstileEnabled();
+  const siteKey = enabled
+    ? (await getTurnstileSiteKey()) || env.TURNSTILE_SITE_KEY || ''
+    : '';
+
+  return {
+    enabled,
+    siteKey
+  };
+}
+
+/**
+ * Validate a Turnstile token when protection is enabled
+ * Returns structured result for auth flows
+ */
+export async function validateTurnstileToken(
+  token: string | null | undefined,
+  remoteip?: string
+): Promise<TurnstileValidationResult> {
+  const enabled = await isTurnstileEnabled();
+
+  if (!enabled) {
+    return {
+      success: true,
+      required: false
+    };
+  }
+
+  if (!token) {
+    return {
+      success: false,
+      required: true,
+      code: 'missing-token',
+      message: 'Please complete the security verification'
+    };
+  }
+
+  const verification = await verifyTurnstileToken(token, remoteip);
+
+  if (!verification.success) {
+    return {
+      success: false,
+      required: true,
+      code: 'verification-failed',
+      message: 'Security verification failed. Please try again.'
+    };
+  }
+
+  return {
+    success: true,
+    required: true
+  };
 }
 
 /**

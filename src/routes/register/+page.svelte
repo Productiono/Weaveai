@@ -7,6 +7,7 @@
   import { Label } from "$lib/components/ui/label";
   import * as Separator from "$lib/components/ui/separator";
   import Logo from "$lib/components/Logo.svelte";
+  import TurnstileWidget from "$lib/components/TurnstileWidget.svelte";
   import { authSanitizers, validatePasswordSafety } from "$lib/utils/sanitization.js";
   import { validatePassword, BALANCED_PASSWORD_POLICY } from "$lib/utils/password-validation.js";
   import { validateEmailForAuth } from "$lib/utils/email-validation.js";
@@ -146,9 +147,6 @@
 <svelte:head>
   <title>Register - {data.settings.siteName}</title>
   <meta name="description" content={data.settings.siteDescription} />
-  {#if data.turnstile?.enabled}
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-  {/if}
 </svelte:head>
 
 <div class="min-h-screen bg-background">
@@ -328,9 +326,12 @@
                 />
               </div>
 
-              {#if data.turnstile?.enabled}
-                <input type="hidden" name="cf-turnstile-response" bind:value={turnstileToken} />
-              {/if}
+              <TurnstileWidget
+                enabled={!!data.turnstile?.enabled}
+                siteKey={data.turnstile?.siteKey ?? ""}
+                bind:token={turnstileToken}
+                inputName="cf-turnstile-response"
+              />
 
               {#if clientError}
                 <div
@@ -359,19 +360,6 @@
                 >.
               </p>
 
-              {#if data.turnstile?.enabled && data.turnstile.siteKey}
-                <div class="flex justify-center">
-                  <div
-                    class="cf-turnstile"
-                    data-sitekey={data.turnstile.siteKey}
-                    data-callback="onTurnstileSuccess"
-                    data-error-callback="onTurnstileError"
-                    data-expired-callback="onTurnstileExpired"
-                    data-theme="auto"
-                    data-size="normal"
-                  ></div>
-                </div>
-              {/if}
             </form>
           </Card.Content>
           <Card.Footer class="justify-center">
@@ -385,34 +373,3 @@
     </div>
   </div>
 </div>
-
-{#if data.turnstile?.enabled}
-  <script>
-    // Global Turnstile callback functions
-    window.onTurnstileSuccess = function(token) {
-      // Find the Svelte component instance to update the token
-      const hiddenInput = document.querySelector('input[name="cf-turnstile-response"]');
-      if (hiddenInput) {
-        hiddenInput.value = token;
-        // Trigger input event to update Svelte binding
-        hiddenInput.dispatchEvent(new Event('input'));
-      }
-    };
-
-    window.onTurnstileError = function() {
-      const hiddenInput = document.querySelector('input[name="cf-turnstile-response"]');
-      if (hiddenInput) {
-        hiddenInput.value = '';
-        hiddenInput.dispatchEvent(new Event('input'));
-      }
-    };
-
-    window.onTurnstileExpired = function() {
-      const hiddenInput = document.querySelector('input[name="cf-turnstile-response"]');
-      if (hiddenInput) {
-        hiddenInput.value = '';
-        hiddenInput.dispatchEvent(new Event('input'));
-      }
-    };
-  </script>
-{/if}

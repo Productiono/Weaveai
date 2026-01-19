@@ -9,6 +9,7 @@
   import { Label } from "$lib/components/ui/label";
   import * as Separator from "$lib/components/ui/separator";
   import Logo from "$lib/components/Logo.svelte";
+  import TurnstileWidget from "$lib/components/TurnstileWidget.svelte";
   import {
     authSanitizers,
     validatePasswordSafety,
@@ -20,6 +21,7 @@
   let password = $state("");
   let loading = $state(false);
   let error = $state("");
+  let turnstileToken = $state("");
 
   // Check for success message from URL params - sanitize for security
   const successMessage = authSanitizers.successMessage(
@@ -39,6 +41,11 @@
       return;
     }
 
+    if (data.turnstile?.enabled && !turnstileToken) {
+      error = "Please complete the security verification";
+      return;
+    }
+
     loading = true;
     error = "";
 
@@ -46,6 +53,7 @@
       const result = await signIn("credentials", {
         email: sanitizedEmail,
         password: passwordValidation.sanitized,
+        turnstileToken,
         redirect: false,
       });
 
@@ -55,6 +63,12 @@
         switch (result.error) {
           case "CredentialsSignin":
             error = "Invalid email or password";
+            break;
+          case "TurnstileRequired":
+            error = "Please complete the security verification";
+            break;
+          case "TurnstileFailed":
+            error = "Security verification failed. Please try again.";
             break;
           case "AccessDenied":
             error = "Access denied. Please check your credentials.";
@@ -348,6 +362,13 @@
                 disabled={loading}
               />
             </div>
+
+            <TurnstileWidget
+              enabled={!!data.turnstile?.enabled}
+              siteKey={data.turnstile?.siteKey ?? ""}
+              bind:token={turnstileToken}
+              inputName="cf-turnstile-response"
+            />
 
             {#if successMessage}
               <div
