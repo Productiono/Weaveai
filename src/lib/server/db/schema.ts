@@ -458,3 +458,101 @@ export const adminFiles = pgTable("admin_files", {
 }, (table) => [
 	index('admin_files_category_idx').on(table.category),
 ])
+
+export const blogPosts = pgTable("blog_posts", {
+	id: text("id")
+		.primaryKey()
+		.$defaultFn(() => randomUUID()),
+	authorId: text("authorId")
+		.notNull()
+		.references(() => users.id, { onDelete: "cascade" }),
+	slug: text("slug").notNull().unique(),
+	title: text("title").notNull(),
+	excerpt: text("excerpt"),
+	contentMarkdown: text("contentMarkdown").notNull(),
+	contentHtml: text("contentHtml"),
+	readingTimeMinutes: integer("readingTimeMinutes"),
+	status: text("status", {
+		enum: ["draft", "scheduled", "published", "archived"],
+	}).notNull().default("draft"),
+	featuredImageUrl: text("featuredImageUrl"),
+	publishedAt: timestamp("publishedAt", { mode: "date" }),
+	scheduledFor: timestamp("scheduledFor", { mode: "date" }),
+	metaTitle: text("metaTitle"),
+	metaDescription: text("metaDescription"),
+	createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+	updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
+}, (table) => [
+	index("blog_posts_status_published_idx").on(table.status, table.publishedAt),
+	index("blog_posts_author_idx").on(table.authorId),
+]);
+
+export const blogCategories = pgTable("blog_categories", {
+	id: text("id")
+		.primaryKey()
+		.$defaultFn(() => randomUUID()),
+	name: text("name").notNull(),
+	slug: text("slug").notNull().unique(),
+	description: text("description"),
+	createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+	updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const blogTags = pgTable("blog_tags", {
+	id: text("id")
+		.primaryKey()
+		.$defaultFn(() => randomUUID()),
+	name: text("name").notNull(),
+	slug: text("slug").notNull().unique(),
+	createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+	updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const blogPostCategories = pgTable("blog_post_categories", {
+	postId: text("postId")
+		.notNull()
+		.references(() => blogPosts.id, { onDelete: "cascade" }),
+	categoryId: text("categoryId")
+		.notNull()
+		.references(() => blogCategories.id, { onDelete: "cascade" }),
+}, (table) => [
+	primaryKey({
+		columns: [table.postId, table.categoryId],
+	}),
+	index("blog_post_categories_post_idx").on(table.postId),
+	index("blog_post_categories_category_idx").on(table.categoryId),
+]);
+
+export const blogPostTags = pgTable("blog_post_tags", {
+	postId: text("postId")
+		.notNull()
+		.references(() => blogPosts.id, { onDelete: "cascade" }),
+	tagId: text("tagId")
+		.notNull()
+		.references(() => blogTags.id, { onDelete: "cascade" }),
+}, (table) => [
+	primaryKey({
+		columns: [table.postId, table.tagId],
+	}),
+	index("blog_post_tags_post_idx").on(table.postId),
+	index("blog_post_tags_tag_idx").on(table.tagId),
+]);
+
+export const blogMedia = pgTable("blog_media", {
+	id: text("id")
+		.primaryKey()
+		.$defaultFn(() => randomUUID()),
+	userId: text("userId")
+		.notNull()
+		.references(() => users.id, { onDelete: "cascade" }),
+	filename: text("filename").notNull(),
+	originalName: text("originalName").notNull(),
+	mimeType: text("mimeType").notNull(),
+	fileSize: integer("fileSize").notNull(),
+	storageLocation: text("storageLocation").notNull().default("local"),
+	path: text("path").notNull(),
+	url: text("url"),
+	createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+}, (table) => [
+	index("blog_media_user_created_idx").on(table.userId, table.createdAt),
+]);

@@ -30,6 +30,15 @@
   <div class="flex items-center gap-4">
     <Sidebar.Trigger class="cursor-pointer" />
 
+    <Button
+      variant="ghost"
+      size="sm"
+      onclick={() => goto("/blog")}
+      class="cursor-pointer"
+    >
+      Blog
+    </Button>
+
     <!-- Admin notification and dashboard button -->
     {#if session?.user?.isAdmin}
       <div class="flex items-center gap-3">

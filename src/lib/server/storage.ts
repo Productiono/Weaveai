@@ -10,6 +10,7 @@ const R2_ACCOUNT_ID = env.R2_ACCOUNT_ID || '';
 const R2_ACCESS_KEY_ID = env.R2_ACCESS_KEY_ID || '';
 const R2_SECRET_ACCESS_KEY = env.R2_SECRET_ACCESS_KEY || '';
 const R2_BUCKET_NAME = env.R2_BUCKET_NAME || '';
+const BLOG_PUBLIC_ASSET_URL = env.BLOG_PUBLIC_ASSET_URL || '';
 import { getCloudStorageSettings } from './admin-settings';
 
 export interface StorageFile {
@@ -559,6 +560,10 @@ class StorageService {
 		}
 	}
 
+	generateBlogPath(filename: string): string {
+		return `blog/${filename}`;
+	}
+
 	generateFilename(originalName: string): string {
 		const id = randomUUID();
 		const ext = originalName.split('.').pop()?.toLowerCase() || '';
@@ -617,6 +622,17 @@ class StorageService {
 			...result,
 			publicUrl
 		};
+	}
+
+	async uploadBlogAsset(file: StorageFile): Promise<StorageResult> {
+		await this.ensureInitialized();
+
+		const filename = file.filename || this.generateFilename('blog');
+		const path = this.generateBlogPath(filename);
+
+		console.log(`Uploading blog asset to ${this.config!.type} storage: ${path}`);
+
+		return await this.provider!.upload(file, path);
 	}
 
 	/**
@@ -690,6 +706,16 @@ class StorageService {
 
 	async getPublicUrl(path: string): Promise<string> {
 		await this.ensureInitialized();
+		return await this.provider!.getPublicUrl(path);
+	}
+
+	async getBlogPublicUrl(path: string): Promise<string> {
+		await this.ensureInitialized();
+
+		if (BLOG_PUBLIC_ASSET_URL) {
+			return `${BLOG_PUBLIC_ASSET_URL.replace(/\/$/, '')}/${path}`;
+		}
+
 		return await this.provider!.getPublicUrl(path);
 	}
 

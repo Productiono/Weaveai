@@ -31,7 +31,18 @@
 
   // Check if current route is an auth route (login/register/reset-password/verify-email), standalone page (pricing, landing page at /), or admin route
   const isStandalonePage = $derived(
-    page.url.pathname === "/" || page.url.pathname === "/login" || page.url.pathname === "/register" || page.url.pathname === "/pricing" || page.url.pathname === "/terms" || page.url.pathname === "/privacy" || page.url.pathname.startsWith("/admin") || page.url.pathname === "/reset-password" || page.url.pathname.startsWith("/reset-password/") || page.url.pathname === "/verify-email" || page.url.pathname.startsWith("/verify-email/")
+    page.url.pathname === "/" ||
+      page.url.pathname === "/login" ||
+      page.url.pathname === "/register" ||
+      page.url.pathname === "/pricing" ||
+      page.url.pathname === "/terms" ||
+      page.url.pathname === "/privacy" ||
+      page.url.pathname.startsWith("/admin") ||
+      page.url.pathname.startsWith("/blog") ||
+      page.url.pathname === "/reset-password" ||
+      page.url.pathname.startsWith("/reset-password/") ||
+      page.url.pathname === "/verify-email" ||
+      page.url.pathname.startsWith("/verify-email/")
   );
 
   // Create global chat state that persists across route changes

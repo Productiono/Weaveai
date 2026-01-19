@@ -8,6 +8,7 @@
     AnalyticsIcon,
     ArrowLeftIcon,
     CreditCardIcon,
+    FileTextIcon,
     GemIcon,
     SettingsIcon,
     SparklesIcon,
@@ -46,6 +47,12 @@
       label: "Subscriptions",
       path: "/admin/subscriptions",
       icon: GemIcon,
+    },
+    {
+      id: "blog",
+      label: "Blog",
+      path: "/admin/blog",
+      icon: FileTextIcon,
     },
     {
       id: "settings",
