@@ -16,6 +16,13 @@
   let currentPage = $state(data.pagination.page);
   let searchQuery = $state(data.filters.search || "");
   let statusValue = $state(data.filters.status || "all");
+  const statusLabels = {
+    all: "All statuses",
+    draft: "Draft",
+    scheduled: "Scheduled",
+    published: "Published",
+    archived: "Archived"
+  } as const;
 
   $effect(() => {
     currentPage = data.pagination.page;
@@ -103,14 +110,17 @@
           <Label>Status</Label>
           <Select.Root bind:value={statusValue} onValueChange={() => updateFilters()}>
             <Select.Trigger>
-              <Select.Value placeholder="All statuses" />
+              <span
+                data-slot="select-value"
+                class={statusValue === "all" ? "text-muted-foreground" : undefined}
+              >
+                {statusLabels[statusValue as keyof typeof statusLabels] ?? statusLabels.all}
+              </span>
             </Select.Trigger>
             <Select.Content>
-              <Select.Item value="all">All statuses</Select.Item>
-              <Select.Item value="draft">Draft</Select.Item>
-              <Select.Item value="scheduled">Scheduled</Select.Item>
-              <Select.Item value="published">Published</Select.Item>
-              <Select.Item value="archived">Archived</Select.Item>
+              {#each Object.entries(statusLabels) as [value, label]}
+                <Select.Item value={value}>{label}</Select.Item>
+              {/each}
             </Select.Content>
           </Select.Root>
         </div>
