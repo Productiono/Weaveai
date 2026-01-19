@@ -1,14 +1,12 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
   import { goto } from "$app/navigation";
-  import { browser } from "$app/environment";
   import * as Card from "$lib/components/ui/card/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import { Textarea } from "$lib/components/ui/textarea/index.js";
   import { Label } from "$lib/components/ui/label/index.js";
   import * as Select from "$lib/components/ui/select/index.js";
-  import { parseMarkdown } from "$lib/utils/markdown.js";
   import type { PageData } from "./$types";
 
   let { data, form }: { data: PageData; form?: { error?: string; values?: Record<string, string> } } = $props();
@@ -26,12 +24,10 @@
   let categories = $state(form?.values?.categories || "");
   let tags = $state(form?.values?.tags || "");
 
-  let previewMode = $state(false);
   let isUploading = $state(false);
   let uploadError = $state("");
   let uploadedUrl = $state("");
-
-  const previewHtml = $derived(browser ? parseMarkdown(contentMarkdown) : "");
+  let editorRef: HTMLTextAreaElement | null = $state(null);
 
   function generateSlug(value: string) {
     return value
@@ -86,6 +82,24 @@
     if (!uploadedUrl || !navigator?.clipboard) return;
     await navigator.clipboard.writeText(uploadedUrl);
   }
+
+  function insertSnippet(snippet: string) {
+    if (!editorRef) {
+      contentMarkdown = `${contentMarkdown}${snippet}`;
+      return;
+    }
+
+    const start = editorRef.selectionStart ?? contentMarkdown.length;
+    const end = editorRef.selectionEnd ?? contentMarkdown.length;
+    contentMarkdown =
+      contentMarkdown.slice(0, start) + snippet + contentMarkdown.slice(end);
+
+    requestAnimationFrame(() => {
+      editorRef?.focus();
+      const cursor = start + snippet.length;
+      editorRef?.setSelectionRange(cursor, cursor);
+    });
+  }
 </script>
 
 <svelte:head>
@@ -108,8 +122,15 @@
     action="?/create"
     class="space-y-6"
     use:enhance={() => {
-      return async ({ update }) => {
+      return async ({ update, result }) => {
         await update();
+
+        if (result.type === "success" && result.data?.previewUrl) {
+          window.open(result.data.previewUrl, "_blank", "noreferrer");
+          if (result.data.editUrl) {
+            goto(result.data.editUrl);
+          }
+        }
       };
     }}
   >
@@ -151,29 +172,49 @@
           <Textarea
             id="contentMarkdown"
             name="contentMarkdown"
-            rows={14}
+            bind:ref={editorRef}
+            rows={18}
             bind:value={contentMarkdown}
+            class="min-h-[360px] font-mono text-sm leading-relaxed"
             required
           />
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
+              size="sm"
               type="button"
-              onclick={() => (previewMode = !previewMode)}
+              onclick={() => insertSnippet("## Heading\\n\\n")}
             >
-              {previewMode ? "Hide" : "Show"} Preview
+              H2
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onclick={() => insertSnippet("[Link text](https://example.com)")}
+            >
+              Link
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onclick={() => insertSnippet("![Alt text](https://example.com/image.jpg)")}
+            >
+              Image
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onclick={() => insertSnippet("```\\ncode\\n```\\n")}
+            >
+              Code
             </Button>
             <span class="text-xs text-muted-foreground">
               Use markdown for headings, lists, and code blocks.
             </span>
           </div>
-          {#if previewMode}
-            <div class="rounded-xl border border-border bg-card p-4">
-              <div class="prose prose-neutral dark:prose-invert max-w-none">
-                {@html previewHtml}
-              </div>
-            </div>
-          {/if}
         </div>
       </Card.Content>
     </Card.Root>
@@ -280,6 +321,9 @@
 
     <div class="flex items-center gap-3">
       <Button type="submit">Create Post</Button>
+      <Button variant="outline" type="submit" formaction="?/savePreview">
+        Save Draft & Preview
+      </Button>
       <Button variant="outline" type="button" onclick={() => goto("/admin/blog")}>Cancel</Button>
     </div>
   </form>

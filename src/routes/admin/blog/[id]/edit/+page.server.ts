@@ -10,6 +10,7 @@ import { calculateReadingTimeMinutes } from '$lib/server/blog/reading-time.js';
 import { ensureValidSlug, slugify } from '$lib/server/blog/slug.js';
 import { ensureCategories, ensureTags, parseCommaList, syncPostCategories, syncPostTags } from '$lib/server/blog/admin.js';
 import { getAllCategories, getAllTags, getPostById, getPostCategories, getPostTags } from '$lib/server/blog/queries.js';
+import { requireAdmin } from '$lib/server/blog/requireAdmin.js';
 
 const PostSchema = z.object({
   title: z.string().min(3),
@@ -25,7 +26,8 @@ const PostSchema = z.object({
   tags: z.array(z.string()).optional()
 });
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, locals }) => {
+  await requireAdmin(locals);
   const post = await getPostById(params.id);
 
   if (!post) {
@@ -50,10 +52,7 @@ export const load: PageServerLoad = async ({ params }) => {
 
 export const actions: Actions = {
   update: async ({ request, params, locals }) => {
-    const session = await locals.auth();
-    if (!session?.user?.id) {
-      return fail(401, { error: 'Unauthorized' });
-    }
+    await requireAdmin(locals);
 
     const postId = params.id;
     const existing = await getPostById(postId);
@@ -190,5 +189,121 @@ export const actions: Actions = {
     ]);
 
     throw redirect(303, `/admin/blog/${postId}/edit`);
+  },
+  savePreview: async ({ request, params, locals }) => {
+    await requireAdmin(locals);
+
+    const postId = params.id;
+    const existing = await getPostById(postId);
+    if (!existing) {
+      return fail(404, { error: 'Post not found' });
+    }
+
+    const data = await request.formData();
+    const rawTitle = data.get('title')?.toString() || '';
+    const rawSlug = data.get('slug')?.toString() || '';
+    const rawExcerpt = data.get('excerpt')?.toString() || '';
+    const rawContent = data.get('contentMarkdown')?.toString() || '';
+    const rawFeaturedImageUrl = data.get('featuredImageUrl')?.toString() || '';
+    const rawMetaTitle = data.get('metaTitle')?.toString() || '';
+    const rawMetaDescription = data.get('metaDescription')?.toString() || '';
+    const categories = parseCommaList(data.get('categories'));
+    const tags = parseCommaList(data.get('tags'));
+
+    const parsed = PostSchema.safeParse({
+      title: rawTitle,
+      slug: rawSlug,
+      excerpt: rawExcerpt,
+      contentMarkdown: rawContent,
+      status: 'draft',
+      featuredImageUrl: rawFeaturedImageUrl,
+      scheduledFor: '',
+      metaTitle: rawMetaTitle,
+      metaDescription: rawMetaDescription,
+      categories,
+      tags
+    });
+
+    if (!parsed.success) {
+      return fail(400, {
+        error: parsed.error.errors[0]?.message || 'Invalid form data',
+        values: {
+          title: rawTitle,
+          slug: rawSlug,
+          excerpt: rawExcerpt,
+          contentMarkdown: rawContent,
+          status: 'draft',
+          featuredImageUrl: rawFeaturedImageUrl,
+          scheduledFor: '',
+          metaTitle: rawMetaTitle,
+          metaDescription: rawMetaDescription,
+          categories: categories.join(', '),
+          tags: tags.join(', ')
+        }
+      });
+    }
+
+    const generatedSlug = ensureValidSlug(rawSlug || slugify(rawTitle));
+
+    const [slugExists] = await db
+      .select({ id: blogPosts.id })
+      .from(blogPosts)
+      .where(and(eq(blogPosts.slug, generatedSlug), ne(blogPosts.id, postId)));
+
+    if (slugExists) {
+      return fail(400, {
+        error: 'Slug is already in use',
+        values: {
+          title: rawTitle,
+          slug: rawSlug,
+          excerpt: rawExcerpt,
+          contentMarkdown: rawContent,
+          status: 'draft',
+          featuredImageUrl: rawFeaturedImageUrl,
+          scheduledFor: '',
+          metaTitle: rawMetaTitle,
+          metaDescription: rawMetaDescription,
+          categories: categories.join(', '),
+          tags: tags.join(', ')
+        }
+      });
+    }
+
+    const now = new Date();
+    const contentHtml = renderMarkdown(rawContent);
+    const readingTimeMinutes = calculateReadingTimeMinutes(rawContent);
+
+    await db
+      .update(blogPosts)
+      .set({
+        slug: generatedSlug,
+        title: sanitizeFormInput(rawTitle, 200),
+        excerpt: sanitizeFormInput(rawExcerpt, 500),
+        contentMarkdown: rawContent,
+        contentHtml,
+        readingTimeMinutes,
+        status: 'draft',
+        featuredImageUrl: rawFeaturedImageUrl || null,
+        publishedAt: null,
+        scheduledFor: null,
+        metaTitle: sanitizeFormInput(rawMetaTitle, 200),
+        metaDescription: sanitizeFormInput(rawMetaDescription, 300),
+        updatedAt: now
+      })
+      .where(eq(blogPosts.id, postId));
+
+    const [categoryRecords, tagRecords] = await Promise.all([
+      ensureCategories(categories),
+      ensureTags(tags)
+    ]);
+
+    await Promise.all([
+      syncPostCategories(postId, categoryRecords.map((category) => category.id)),
+      syncPostTags(postId, tagRecords.map((tag) => tag.id))
+    ]);
+
+    return {
+      previewUrl: `/blog/${generatedSlug}?preview=1`
+    };
   }
 };
